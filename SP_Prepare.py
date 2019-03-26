@@ -1,12 +1,10 @@
-#!/usr/bin/env python
-
-""" SP_Prepare2 - Substract background to science data  
-    v1.0: 2018-04-19, mdevogele@lowell.edu
-  
+#!/usr/bin/env python2
+# -*- coding: utf-8 -*-
 """
+Created on Tue Mar 13 21:49:06 2018
 
-
-import argparse, shlex
+@author: maximedevogele
+"""
 
 import os
 import logging
@@ -19,8 +17,14 @@ from SP_CheckObsType import CheckObsType
 import _SP_conf
 from SP_CheckInstrument import CheckInstrument
 
+# setup logging
+logging.basicConfig(filename = _SP_conf.log_filename,
+                    level    = _SP_conf.log_level,
+                    format   = _SP_conf.log_formatline,
+                    datefmt  = _SP_conf.log_datefmt)
 
-def Prepare(filenames,Verbose):
+
+def Prepare(filenames):
     
     
     # Get current directory 
@@ -54,8 +58,15 @@ def Prepare(filenames,Verbose):
 
 
     telescope, obsparam = CheckInstrument(filenames)
-
-
+    # Copy raw file to Procc folders (These files will be modified)
+    
+#    for idx, filename in enumerate(filenames):
+#        shutil.copy('./' + 'raw/' + filename, './' + Dir_To_Create + '/' + filename)
+        
+    # Move the working directory to the processing directory
+    
+#    os.chdir(Directory + '/' + Dir_To_Create)
+    
     # change FITS file extensions to .fits
     for idx, filename in enumerate(filenames):
         if filename.split('.')[-1] in ['fts', 'FTS', 'FITS', 'fit', 'FIT']:
@@ -63,12 +74,7 @@ def Prepare(filenames,Verbose):
             filenames[idx] = '.'.join(filename.split('.')[:-1])+'.fits'
             logging.info('change filename from "%s" to "%s"' %
                          (filename, filenames[idx]))
-        if telescope == 'SOAR':
-            hdulist = fits.open(filename)
-            hdulist[0].data = hdulist[0].data[200:-200,:]
-            hdulist.writeto(filename,overwrite = True)
-
-
+            
     # identify keywords for GENERIC telescopes
 
     # open one sample image file
@@ -77,10 +83,9 @@ def Prepare(filenames,Verbose):
     header = hdulist[0].header
     
     # keywords that have to be implanted into each image
-    implants = {}
+#    implants = {}
     
     # prepare image headers for spectroscopic pipeline
-    
     
     CheckObsType(filenames)
     
@@ -116,51 +121,3 @@ def Prepare(filenames,Verbose):
 #    logging.info('Done! -----------------------------------------------------')
 
     return None   
-
-
-if __name__ == '__main__':
-    
-    parser = argparse.ArgumentParser(description='Prepare the files for the spectroscopic pipeline')
-#    parser.add_argument('-prefix', help='data prefix',
-#                        default=None)
-#    parser.add_argument('-target', help='primary targetname override',
-#                        default=None)
-#    parser.add_argument('-m', help='add flats information to diagnostic.htlm file',
-#                        choices=['auto','range'])
-#    parser.add_argument('-s', help='If there is several series of flat \n || Options: none: Only one serie \n || index: split according to the index of the files \n || target: split according to the target name in fits headers \n || pointing: split according to telescope pointing according to fits headers',
-#                        choices=['none','index','target','pointing'],
-#                        default = 'None')
-#    parser.add_argument('-b',
-#                        help='Name of the master bias to use \n || Can use None if no bias are available',
-#                        default='MasterBias.fits')
-    parser.add_argument('-v',
-                        help='Increase verbosity',
-                        action="store_true")    
-#    parser.add_argument('-r',
-#                        help='Range of pixels to use for background subtraction',
-#                        nargs=2)    
-    parser.add_argument('images', help='images to process or \'all\'',
-                        nargs='+')
-
-    args = parser.parse_args()
-#    prefix = args.prefix
-#    man_targetname = args.target
-#    Method = args.m
-#    Series = args.s
-#    MasterBias = args.b
-    Verbose = args.v
-#    Range = args.r
-    filenames = args.images  
-    
-    print(filenames)
-
-    
-    
-    # call run_the_pipeline only on filenames
-    Prepare(filenames,Verbose)
-    pass
-
-
-
-
-

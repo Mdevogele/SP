@@ -7,19 +7,13 @@
 import argparse, shlex
 
 import SP_Toolbox as SP
-import SP_Deveny_Toolbox as SP_Dev_Tool
 import numpy as np
-import SP_diagnostics as diag
 
 from SP_CheckInstrument import CheckInstrument
 
 import simplejson
 
 from astropy.io import fits
-
-import cosmic
-
-import _SP_conf
 
 def Detect_Spectra(filename,OutName,DetecLim):
     

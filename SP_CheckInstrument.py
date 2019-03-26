@@ -1,7 +1,7 @@
 #!/usr/bin/env
 
 """ SP_CheckInstrument - Script that check the instrument for each file
-    v1.0: 2018-03-15, michael.mommert@nau.edu
+    v1.0: 2018-03-15, mdevogele@lowell.edu
 """
 from __future__ import print_function
 
@@ -28,13 +28,7 @@ import logging
 
 from astropy.io import fits
 
-
-
-# setup logging
-logging.basicConfig(filename = _SP_conf.log_filename,
-                    level    = _SP_conf.log_level,
-                    format   = _SP_conf.log_formatline,
-                    datefmt  = _SP_conf.log_datefmt)
+import SP_Toolbox as SP
 
 
 def CheckInstrument(filenames):
@@ -45,7 +39,6 @@ def CheckInstrument(filenames):
         except IOError:
             logging.error('cannot open file %s' % filename)
             print('ERROR: cannot open file %s' % filename)
-            #filenames.pop(idx)
             continue
 
         header = hdulist[0].header
@@ -53,9 +46,6 @@ def CheckInstrument(filenames):
             if key in header:
                 instruments.append(header[key])
                 break
-
-    if len(filenames) == 0:
-        raise IOError('cannot find any data...')
 
     if len(instruments) == 0:
         raise KeyError('cannot identify telescope/instrument; please update' + \
@@ -65,7 +55,7 @@ def CheckInstrument(filenames):
     # check if there is only one unique instrument
     if len(set(instruments)) > 1:
         print('ERROR: multiple instruments used in dataset: %s' % \
-            str(set(instruemnts)))
+            str(set(instruments)))
         logging.error('multiple instruments used in dataset: %s' %
                       str(set(instruments)))
         for i in range(len(filenames)):
@@ -73,7 +63,46 @@ def CheckInstrument(filenames):
         sys.exit()
 
     telescope = _SP_conf.instrument_identifiers[instruments[0]]
-    obsparam = _SP_conf.telescope_parameters[telescope]
+    obsparam = _SP_conf.telescope_parameters[telescope]    
+    
+    
+    # for the different detectors of GMOS North and Souths
+    # Definition of the location of the CHIP GAPS and detector pixscale
+    if telescope == 'GMOSN':
+        if hdulist[0].header[obsparam['detector']] == 'GMOS + e2v DD CCD42-90':
+            obsparam['pixscale'] = 0.07288
+            if SP.get_binning(hdulist[1].header,obsparam)[0] == 2:
+                obsparam['ship_gap'] = ([1023,1046],[2068,2091])
+            if SP.get_binning(hdulist[1].header,obsparam)[0] == 4:
+                obsparam['ship_gap'] = ([511,523],[1033,1045])
+        if hdulist[0].header[obsparam['detector']] == 'GMOS-N + Hamamatsu':
+            obsparam['pixscale'] = 0.0807
+            if SP.get_binning(hdulist[1].header,obsparam)[0] == 2:    #to be defined
+                obsparam['ship_gap'] = ([0,0],[0,0])
+            if SP.get_binning(hdulist[1].header,obsparam)[0] == 4:    #to be defined
+                obsparam['ship_gap'] = ([0,0],[0,0])
+        if obsparam['pixscale'] == 0:
+                    print('The detector: ' + hdulist[0].header[obsparam['detector']] + 'is not found it the database, use of default 0.08 arcsec/pixel default prixel scale')
+
+    if telescope == 'GMOSS':
+        if hdulist[0].header[obsparam['detector']] == 'GMOS + Blue1 + new CCD1':
+            obsparam['pixscale'] = 0.073
+            if SP.get_binning(hdulist[1].header,obsparam)[0] == 2:    #to be defined
+                obsparam['ship_gap'] = ([0,0],[0,0])
+            if SP.get_binning(hdulist[1].header,obsparam)[0] == 4:    #to be defined
+                obsparam['ship_gap'] = ([0,0],[0,0])
+        if hdulist[0].header[obsparam['detector']] == 'GMOS + Hamamatsu_new':  
+            obsparam['pixscale'] = 0.08
+            if SP.get_binning(hdulist[1].header,obsparam)[0] == 2:    #to be defined
+                obsparam['ship_gap'] = ([0,0],[0,0])
+            if SP.get_binning(hdulist[1].header,obsparam)[0] == 4:    #to be defined
+                obsparam['ship_gap'] = ([0,0],[0,0])
+        
+        if obsparam['pixscale'] == 0:
+                    print('The detector: ' + hdulist[0].header[obsparam['detector']] + 'is not found it the database, use of default 0.08 arcsec/pixel default prixel scale')
+        
+    
+    
     logging.info('%d %s frames identified' % (len(filenames), telescope))
     
     return telescope, obsparam

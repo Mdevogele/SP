@@ -8,27 +8,35 @@
 import argparse, shlex
 
 import SP_Toolbox as SP
-import SP_Deveny_Toolbox as SP_Dev_Tool
 import numpy as np
-import SP_diagnostics as diag
 
 import simplejson
 
 from astropy.io import fits
 import operator
 
+import SP_diagnostics as diag
+
+
 from SP_CheckInstrument import CheckInstrument
 
 
-def Extract_Spectrum(filename,Verbose,Spec_loc): 
+def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic): 
     
+    
+    Out_Files = []
+    Out_Spec = []
     telescope, obsparam = CheckInstrument([filename[0]])    
     DetecFlags = {'Instrument':telescope}
-    if telescope == 'DEVENY':
+    if telescope == 'DEVENY' or telescope == 'SOAR':
         for elem in filename:
             hdulist = fits.open(elem)
             data = hdulist[0].data
-            DetecFlags = {'Instrument':'Deveny'}  
+            if telescope == 'DEVENY':
+                DetecFlags = {'Instrument':'Deveny'}  
+            if telescope == 'SOAR':
+                DetecFlags = {'Instrument':'Soar'}  
+
             Center = SP.Detect_Spectra(data,Bin=2,**DetecFlags)
             Start = (1415,Center)
             
@@ -36,25 +44,27 @@ def Extract_Spectrum(filename,Verbose,Spec_loc):
 
             TR=[]
             for idx,elem2 in enumerate(Trace):
-                if elem2 > 15:
-                    TR.append(data[int(elem2)-15:int(elem2)+15,idx])
+                if elem2 > 50 and elem2 < np.size(data,0)-50:
+                    TR.append(data[int(elem2)-45:int(elem2)+45,idx])
                 else: 
-                    TR.append(data[0:30,idx])
+                    TR.append(data[0:90,idx])
             TR = np.array(TR)
             hdulist[0].data = np.transpose(TR)
             hdulist.writeto(elem.replace('.fits','') + 'Trace.fits' )
+            Out_Files.append(elem.replace('.fits','') + 'Trace.fits')
 
             SSpec = []
             for FW in range(20):
                 Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=FW,Mask = MASK1,**DetecFlags)
                 SSpec.append(Spec1)
                 
-            max_index, max_value = max(enumerate(np.nanmedian(SSpec,axis=1)/np.nanstd(SSpec,axis=1)), key=operator.itemgetter(1))
-            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=max_index+1,Mask = MASK1,**DetecFlags)
+#            max_index, max_value = max(enumerate(np.nanmedian(SSpec,axis=1)/np.nanstd(SSpec,axis=1)), key=operator.itemgetter(1))
+            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=6,Mask = MASK1,**DetecFlags)
             
 #            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=50,Mask = MASK1,**DetecFlags)
             Spec1N = Spec1/np.abs(np.nanmedian(Spec1[1500:1600]))
             f = open(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt','w')
+            Out_Spec.append(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt')
             for item in Spec1N:
                 f.write("%s\n" % item)
             
@@ -90,7 +100,7 @@ def Extract_Spectrum(filename,Verbose,Spec_loc):
             print(Start)
             data = hdulist[0].data
             data[data==0] = np.nan
-            Trace, bkg, MASK1 = SP.Fit_Trace(data,Start,Range = 15, SClip = True,**DetecFlags)
+            Trace, bkg, MASK1 = SP.Fit_Trace(data,Start,Range = 10, SClip = True,**DetecFlags)
             
             
             # write a fits file with the extracted trace
@@ -103,6 +113,8 @@ def Extract_Spectrum(filename,Verbose,Spec_loc):
             TR = np.array(TR)
             hdulist[0].data = np.transpose(TR)
             hdulist.writeto(elem.replace('.fits','') + 'Trace.fits' )
+            Out_Files.append(elem.replace('.fits','') + 'Trace.fits')
+
             
             SSpec = []
             for FW in range(20):
@@ -110,7 +122,8 @@ def Extract_Spectrum(filename,Verbose,Spec_loc):
                 SSpec.append(Spec1)
                 
             max_index, max_value = max(enumerate(np.nanmedian(SSpec,axis=1)/np.nanstd(SSpec,axis=1)), key=operator.itemgetter(1))
-            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=max_index+1,Mask = MASK1,**DetecFlags)
+#            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=max_index+1,Mask = MASK1,**DetecFlags)
+            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=4,Mask = MASK1,**DetecFlags)
     
             
             
@@ -120,12 +133,16 @@ def Extract_Spectrum(filename,Verbose,Spec_loc):
                 Spec1N = Spec1/np.abs(np.nanmedian(Spec1[800:850]))
 
             f = open(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt','w')
+            Out_Spec.append(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt')
+
             for item in Spec1N:
                 f.write("%s\n" % item)
             
             f.close()
 
-        
+    if Diagnostic: 
+        diag.create_website('Extract_Log.html')
+        diag.add_Extract(Out_Files,Out_Spec,'Extract_Log.html')
             
         
 
@@ -135,45 +152,31 @@ def Extract_Spectrum(filename,Verbose,Spec_loc):
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(description='Extract spectrum')
-#    parser.add_argument('-prefix', help='data prefix',
-#                        default=None)
-#    parser.add_argument('-target', help='primary targetname override',
-#                        default=None)
-#    parser.add_argument('-m', help='add flats information to diagnostic.htlm file',
-#                        choices=['auto','range'])
-#    parser.add_argument('-s', help='If there is several series of flat \n || Options: none: Only one serie \n || index: split according to the index of the files \n || target: split according to the target name in fits headers \n || pointing: split according to telescope pointing according to fits headers',
-#                        choices=['none','index','target','pointing'],
-#                        default = 'None')
-#    parser.add_argument('-b',
-#                        help='Name of the master bias to use \n || Can use None if no bias are available',
-#                        default='MasterBias.fits')
+
     parser.add_argument('-v',
                         help='Increase verbosity',
                         action="store_true")    
-#    parser.add_argument('-r',
-#                        help='Range of pixels to use for background subtraction',
-#                        nargs=2)    
+
     parser.add_argument('images', help='images to process or \'all\'',
                         nargs='+')
     parser.add_argument('-g',
                         help='Generic name of the offset and spectra location')
 
+    parser.add_argument('-d',
+                        help='Enable or disable the diagnostic',
+                        action="store_false",
+                        default = True)  
+
     args = parser.parse_args()
-#    prefix = args.prefix
-#    man_targetname = args.target
-#    Method = args.m
-#    Series = args.s
-#    MasterBias = args.b
+
     Verbose = args.v
     Spec_loc = args.g
-#    Range = args.r
     filenames = args.images  
+    Diagnostic = args.d
     
     print(filenames)
 
     
-    
-    # call run_the_pipeline only on filenames
-    Extract_Spectrum(filenames,Verbose,Spec_loc)
+    Extract_Spectrum(filenames,Verbose,Spec_loc,Diagnostic)
     pass
 

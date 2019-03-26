@@ -18,8 +18,7 @@ Spectroscopy pipeline:
 import fileSelect as fs
 import os, sys
 import copy
-#from pyraf import iraf
-#from pyraf.iraf import gemini, gemtools, gmos, onedspec
+
 import numpy as np
 import operator
 from astropy.io import fits
@@ -35,13 +34,10 @@ import numpy.ma as ma
 import prompt_hack
 import csv
 from matplotlib.cbook import get_sample_data
-#from matplotlib import rc
+
 from scipy.interpolate import UnivariateSpline
 from astropy.convolution import convolve, Box1DKernel
 
-
-
-#from SP_CheckInstrument import CheckInstrument
 
 from astropy.coordinates import ICRS, Galactic, FK4, FK5
 from astroquery.simbad import Simbad
@@ -53,42 +49,6 @@ from SP_CheckInstrument import CheckInstrument
 import _SP_conf
 
 
-#rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':14})
-## for Palatino and other serif fonts use:
-#rc('font',**{'family':'serif','serif':['Palatino']})
-#rc('text', usetex=True)
-
-KEY_LIST = ['obs_id',
-            'use_me',
-            'N_ext',
-            'File',
-            'DateObs',
-            'TimeObs',
-            'Instrument',
-            'Object',
-            'RA',
-            'Dec',
-            'ObsType',
-            'ObsClass',
-            'CcdBin',
-            'RoI',
-            'NodMode',
-            'NS_Shift',
-            'NS_Cycles',
-            'DTA_Xoffset',
-            'Filter1',
-            'Filter2',
-            'Disperser',
-            'AperMAsk',
-            'MaskType',
-            'Rotator',
-            'CentWave',
-            'T_exp',
-            'Airmass',
-            'Quality',
-            'Xoffset',
-            'Yoffset']
-
 
 CHIP_GAP_B4 = ([500,528],[1029,1058])
 CHIP_GAP_B2 = ([1007,1063],[2062,2114])
@@ -96,67 +56,82 @@ CHIP_GAP_B2 = ([1007,1063],[2062,2114])
 CHIP_GAP2_B4 = ([500,528],[1029,1058])
 CHIP_GAP2_B2 = ([732,752],[1426,1446])
 
+def Check(filename):
+    
+    instruments =[] 
+    for elem in filename:
+        if not os.path.isfile(elem):
+            raise IOError('No such file: ' + str(elem))
+            
+        try:
+            hdulist = fits.open(elem, ignore_missing_end=True)
+        except IOError:
+            print('ERROR: cannot open file %s' % elem)
+            continue
 
-# Check the observed object 
-#def Check_Obj(filename):
-#    telescope, obsparam = CheckInstrument(filename)
-#    hdulist = fits.open(filename)
-#    result_table = Simbad.query_region(coord.SkyCoord(hdulist[0].header[obsparam['ra']] + ' ' + hdulist[0].header[obsparam['dec']] ,unit=(u.hourangle,u.deg), frame='icrs'), radius='0d0m10s')
-    
-#    List_ID_SA = ['HD  11532', 'HD  28099', 'HD 292561', 'BD+00  2717','BD-00  2719','HD 139287',
-#              'BD+00  3383', 'TYC  447-508-1','BD-00  4074', 'BD-00  4251B','BD-00  4557']
-    
-#    List_ID_SA_Comp = {'HD  11532': 'SA 93-101', 'HD  28099': 'Hya 64',
-#                       'HD 292561': 'SA 98-978', 'BD+00  2717': 'SA102-1081',
-#                       'BD-00  2719': 'SA105-56', 'HD 139287': 'SA 107-684',
-#                       'BD+00  3383': 'SA107-998', 'TYC  447-508-1': 'SA 110-361',
-#                       'BD-00  4074': 'SA 112-1333','BD-00  4251B': 'SA 113-276' ,
-#                       'BD-00  4557': 'SA 115-271'}    
+        header = hdulist[0].header
+        for key in _SP_conf.instrument_keys:
+            if key in header:
+                instruments.append(header[key])
+                break
+
+    if len(np.unique(instruments)) == 0:
+        raise KeyError('cannot identify telescope/instrument; please update' + \
+                       '_SP_conf.instrument_keys accordingly')
+
+    if len(np.unique(instruments)) > 1:
+        raise Warning('More than one instrument identified')    
     
     
-#    if result_table['MAIN_ID'][0] in List_ID_SA: 
-#        ObjName = List_ID_SA_Comp[result_table['MAIN_ID'][0]]
+    if len(filename) == 0:
+        raise IOError('cannot find any data...')
+
+def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Tresh_Arcs = [8, 20]):
+
+
+    Arcs[np.isnan(Arcs)] = 0
+    
+    Arcs_loc = []
+    max_index, max_value = max(enumerate(Arcs), key=operator.itemgetter(1))
+    plt.plot(Arcs)
+    while np.median(Arcs) < max_value-5*np.std(Arcs):
+        max_index, max_value = max(enumerate(Arcs), key=operator.itemgetter(1))
         
-#    return ObjName
+        # Search for the size of the arc lines 
+        
+        value = 999999
+        min_ind = max_index
+        while value> max_value/Tresh_Det:
+            min_ind -= 1
+            value = Arcs[min_ind]
     
+        value = 999999
+        max_ind = max_index
+        while value> max_value/Tresh_Det:
+            max_ind += 1
+            value = Arcs[max_ind]        
+            
+        Arcs_Size = (max_ind - min_ind)
+        if Arcs_Size < Tresh_Arcs[1] and Arcs_Size > Tresh_Arcs[0] :
+            print(Arcs_Size)
+            Arcs_loc.append(int(max_ind+min_ind)/2)
+        
+        Arcs[min_ind-4:max_ind+4] = np.median(Arcs)
 
-def Get_AsteroidList():
     
-    filenames = _SP_conf.filenames
+    for elem in Arcs_loc:
+        plt.plot([elem,elem],[0,60000])
     
-    Asteroid_List = []
-    for idx, elem in enumerate(filenames):
-        if elem.split('_')[3] == 'Asteroid':
-            Asteroid_List.append(elem)
- 
-    _SP_conf.Asteroid_filenames = Asteroid_List
+    return Arcs_loc
 
-
-def Get_FlatList():
-    
-    filenames = _SP_conf.filenames
-    
-    Flat_List = []
-    for idx, elem in enumerate(filenames):
-        if elem.split('_')[3] == 'FLAT':
-            Flat_List.append(elem)
- 
-    _SP_conf.Flat_filenames = Flat_List
-
-def Get_BiasList():
-    
-    filenames = _SP_conf.filenames
-    
-    Bias_List = []
-    for idx, elem in enumerate(filenames):
-        if elem.split('_')[3] == 'BIAS':
-            Bias_List.append(elem)
- 
-    _SP_conf.Bias_filenames = Bias_List
-    
     
 
 def Get_Consecutive(seq):
+    
+    """ From a list on numbers, provide the sublists of consecutive numbers 
+     Ex: MyList = [0,1,2,5,6,7,9,10,11]
+         OutLists = [[0,1,2],[5,6,7],[9,10,11]] """
+    
     Series = []
     subseries=[]
     for idx,elem in enumerate(seq):
@@ -173,7 +148,22 @@ def Get_Consecutive(seq):
     return Series
 
 
+
+
+## Which one is actually needed? 
+def Get_Binning(files):
+    
+    """ derive binning from image header"""
+    
+    hdulist = fits.open(files)
+    
+    Binning = hdulist[1].header['CCDSUM']
+    Bin = int(Binning[0])
+    
+    return Bin
+
 def get_binning(header, obsparam):
+    
     """ derive binning from image header
         use obsparam['binning'] keywords, unless both keywords are set to 1
         return: tuple (binning_x, binning_y)"""
@@ -206,8 +196,19 @@ def get_binning(header, obsparam):
     return (binning_x, binning_y)
 
 
+
+
 def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
+    
+    """ Generate a figure containing the asteroid spectrum with overlay the best taxonomic type """
+    
+    # Variables definition
     Wv = []
+    Data_Tax = []
+    Data_Err = []
+    
+    # Read the busdemeo-meanspectra.csv containing the templates for each taxonpmic type
+    
     f = open('/Users/maximedevogele/Documents/PythonPackages/SP/busdemeo-meanspectra.csv', 'rU')
     Tax = csv.reader(f)
     T1 = next(Tax)
@@ -215,8 +216,7 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
     Head = T1
     Head_Tax = np.array(Head[1::2])
     Head_Err = np.array(Head[2::2])
-    Data_Tax = []
-    Data_Err = []
+
     for row in Tax:
         Wv.append(row[0])
         Data_Tax.append(row[1::2])
@@ -231,10 +231,12 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
 
     Data_Err = Data_Err.T
 
+    # Some types have undefined enveloppes
     Data_Err[4,:] = 0.03
     Data_Err[10,:] = 0.03
     Data_Err[12,:] = 0.03
 
+    # Rebin the asteroid spectra to match the taxonomic templates
     Wave = np.linspace(0.425,0.975,12)
     Dw = (0.975-0.425)/11
     
@@ -272,7 +274,7 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
     Chi = []
     min_index, min_value = min(enumerate(ChiSq), key=operator.itemgetter(1))
 
-
+    # Rebin the asteroid spectra for plotting 
     Wave = np.linspace(0.39,0.99,31)
     Dw = (0.98-0.38)/30
     
@@ -299,6 +301,9 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
 
     Num_Tax = 12
     
+    
+    # Generate the plot
+    
     plt.plot(Wav,Spec,zorder=1)
     plt.errorbar(Wave_out,Spec_out,yerr = Error,fmt='.k',markersize=12,zorder=3, label= SpecName + ' (Binned)')
     plt.fill_between(Wv[0:Num_Tax], Data_Tax[min_index,0:Num_Tax] - Data_Err[min_index,0:Num_Tax], Data_Tax[min_index,0:Num_Tax] + Data_Err[min_index,0:Num_Tax],alpha=0.8,facecolor='grey',zorder=2, label= 'Taxonomy: ' + str(Taxonomy[0]))    
@@ -306,14 +311,9 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
     plt.legend()
 
     axes = plt.gca()
-#    axes.set_ylim(min(Data_Tax[min_index,0:12]) - 0.2,max(Data_Tax[min_index,0:12]) + 0.2)
     axes.set_ylim(0.55,1.6)
 
     fig = plt.gcf()
-
-#    plt.text(0.5, 0.1,'Taxon =' + Taxonomy[0], horizontalalignment='center',
-#      verticalalignment='center',
-#      transform=axes.transAxes,fontsize=16)
     
     plt.title(Facility + ', ' + SpecName )
     plt.xlabel(r'Wavelength [micron]', fontsize=14)
@@ -425,70 +425,6 @@ def Get_Taxonomy(Wav,Spec):
         
     return zip(Head_Tax[Index],Chi)
     
-
-def bckg_sub(files,out):
-
-    hdulist = fits.open(files)
-    image = hdulist[0].data
-    
-    Mask = np.zeros((2088,3132))
-    
-    Mask[:,:] =  0
-    
-    Mask[0:600,:] = 1
-    Mask[CHIP_GAP2_B2[0][0]:CHIP_GAP2_B2[0][1],:] = 1
-    Mask[CHIP_GAP2_B2[1][0]:CHIP_GAP2_B2[1][1],:] = 1
-    Mask[800:1200,:] = 1
-    Mask[1400:,:] = 1
-    
-    Mask = Mask.astype(bool)
-    
-    image2 = ma.masked_array(image,mask = Mask)
-    
-    
-    X = range(2088)
-    X = np.array(X)
-    
-    for i in range(3132):
-        image3 = Sigma_Clip(image2[:,i])
-        XX = ma.masked_array(X,image3.mask)
-        z = np.ma.polyfit(XX,image3 , 2)
-        p = np.poly1d(z)
-        image[:,i] = image[:,i] - p(X)
-        
-    hdulist.writeto(out)
-
-def str_to_bool(s):
-    if s == 'True':
-         return True
-    elif s == 'False':
-         return False
-    else:
-         raise ValueError("Cannot covert {} to a bool".format(s))
-
-def Write_Log(string,Proc_Dir):
-    now = datetime.datetime.now()
-    f = open('./' + Proc_Dir + '/ProcLogFile','a')
-    
-    ToWrite = now.isoformat() + ':'
-    
-    ToWrite = ToWrite + '\t' + string + '\n'
-    
-    f.write(ToWrite)
-    f.close()
-    
-    print(ToWrite)
-
-
-def Get_Binning(files):
-    
-    hdulist = fits.open(files)
-    
-    Binning = hdulist[1].header['CCDSUM']
-    Bin = int(Binning[0])
-    
-    return Bin
-
 
 def Cut_Image(data,Bin = 4):
     
@@ -646,6 +582,7 @@ def Image_Add(im1,im2,out,data = 0):
     hdulist1.writeto(out)    
 
 
+## is GMOS_open not used anymore? 
 def GMOS_open2(image):
     
     telescope, obsparam = CheckInstrument(image)
@@ -754,79 +691,7 @@ def GMOS_open(image):
     
 
 
-def Create_Bias(image_list,**kw):
 
-    
-    ###### Parse the argument sent through the function #######
-
-    # Do the program displays text during the processing ?
-    # [False], True
-    if kw.has_key('Verbose'):
-        verbose = kw['Verbose']
-    else:
-        verbose = False
-    
-    # Do the program create a fits file with the MasterBias ?
-    # WriteFile = True : Create a fits file named MasterBias.fits
-    # WriteFile = False : Do not create any fits file
-    # WriteFile = 'any string' : Create a fits file named the string given
-    # [False]
-    if kw.has_key('WriteFile'):
-        WriteFile = kw['WriteFile']
-        if WriteFile is True:
-            print('No bias name was provided, MasterBias.fits is used as default')
-            NameBias = 'MasterBias.fits'
-        NameBias = kw['WriteFile']
-        WriteFile = True
-    else:
-        WriteFile = False
-    
-    # Indicate where the raw data are located 
-    # Take the current directory as default 
-    if kw.has_key('RawPath'):
-        RawPath = kw['RawPath']
-    else:
-        RawPath = './'    
-    
-    # Do you want to want to overwrite if the file already exist ? 
-    # [False]
-    if kw.has_key('OverWrite'):
-        OverWrite = kw['OverWrite']
-    else:
-        OverWrite = False   
-        
-    if kw.has_key('AddFits'):
-        AddFits = kw['AddFits']
-    else:
-        AddFits = True 
-        
-    if kw.has_key('IsGMOS'):
-        IsGMOS = kw['IsGMOS']
-    else:
-        IsGMOS = True 
-    
-    ###### End of argument parsing #######
-    
-    Bias = []
-    for image in image_list:
-        if AddFits:
-            toopen = RawPath + image + '.fits'
-        else:
-            toopen = RawPath + image
-        if IsGMOS:    
-            hdulist = GMOS_open(toopen)
-        else:
-            hdulist = fits.open(toopen)
-        Bias.append(hdulist[0].data)
-    hdulist[0].data
-    MasterBias = np.median(Bias,axis = 0 )
-    
-    hdulist[0].data = MasterBias
-    if WriteFile:
-        hdulist.writeto(NameBias, overwrite = OverWrite)
-    hdulist.close()
-    
-    return MasterBias
 
 def Create_Flat(image_list,**kw):
     ''' 
@@ -949,7 +814,12 @@ def Create_Flat(image_list,**kw):
  #           Bias[i,:] = DFlat[i,:]/aa #flat_curve
         Flat.append(Bias) #/np.median((hdulist[0].data[592:2227,:]-MasterBias[592:2227,:])))
     
-    MasterFlat = np.median(Flat,axis = 0)
+    
+    
+    MasterFlat = np.nanmedian(Flat,axis = 0)
+    MasterFlat[MasterFlat == np.inf] = 1
+    MasterFlat[MasterFlat == -np.inf] = 1
+    
     indices = np.argwhere(np.isnan(MasterFlat))
     
     for ind in indices:
@@ -1088,6 +958,33 @@ def Wav_Cal2(Arc ,**kw):
     else:
         Detector = 'Det'
 
+
+
+    if Instrument == 'Soar':
+        print('Instrument = Soar')
+
+        Master = '/Users/maximedevogele/Documents/PythonPackages/SP/Soar_Arcs_Master'        
+
+        with open(Master) as f:
+            Master_Arcs = f.read().splitlines()
+        Master_Arcs = np.array(Master_Arcs).astype(float)
+
+        data = Arc
+        
+        data = data - np.median(data);
+        data = data / np.mean(data);
+    
+        Lines = np.median(data[250:260,:],axis=0)
+        LL = [Lines, Lines,Lines, Lines,Lines, Lines,Lines, Lines]
+        LL2 = [Master_Arcs, Master_Arcs,Master_Arcs, Master_Arcs,Master_Arcs, Master_Arcs,Master_Arcs, Master_Arcs]
+        
+        result = ird.similarity(np.array(LL2), np.array(LL), numiter=3)
+        
+        x = np.array(range(2071))
+        Wav = (x+result['tvec'][1])*1.9752+4956.4
+
+
+
     if Instrument == 'Deveny':
         print('Instrument = Deveny')
         Master = '/Users/maximedevogele/Documents/PythonPackages/SP/Deveny_Arcs_Master'
@@ -1095,11 +992,7 @@ def Wav_Cal2(Arc ,**kw):
             Master_Arcs = f.read().splitlines()
         Master_Arcs = np.array(Master_Arcs).astype(float)
         Master_Arcs = Master_Arcs/39
-        
-        #hdulist = fits.open(Arc)
-        #data = hdulist[0].data
-        #hdulist.close()
-        
+                
         data = Arc
         
         data = data - np.median(data);
@@ -1116,6 +1009,7 @@ def Wav_Cal2(Arc ,**kw):
         
     if Instrument == 'GMOSS' or Instrument == 'GMOSN':
         print(Gratting)
+        print(Detector)
         if 'R150+' in Gratting:
             if Binning == '2':
                 if 'e2v DD CCD42-90' in Detector:
@@ -1136,6 +1030,7 @@ def Wav_Cal2(Arc ,**kw):
                     
                 else:
                     Master = '/Users/maximedevogele/Documents/PythonPackages/SP/Gemini_B2_R150_Arcs_Master'
+                    print('tttt')
                     
                     with open(Master) as f:
                         Master_Arcs = f.read().splitlines()
@@ -1146,10 +1041,14 @@ def Wav_Cal2(Arc ,**kw):
                     data = data - np.nanmedian(data);
                     data = data / np.nanmean(data);
             
-                    Lines = np.nanmedian(data[1000:1100,:],axis=0)
+                    Lines = np.nanmedian(data[800:1100,:],axis=0)
             
-                    Lines = Lines[1350:1700]
-                    Master_Arcs = Master_Arcs[1350:1700]
+                    Lines = Lines[500:770]
+                    Master_Arcs = Master_Arcs[700:970]
+
+                    Master_Arcs = Master_Arcs/np.nanmax(Master_Arcs)
+                    Lines = Lines/np.nanmax(Lines)
+
                 
             if Binning == '4':
                 Master = '/Users/maximedevogele/Documents/Gemini/CuAr/Gemini_MasterArc_R150.fits'
@@ -1162,10 +1061,14 @@ def Wav_Cal2(Arc ,**kw):
                 print('Bla')
                 if Instrument == 'GMOSS':
                     Master = '/Users/maximedevogele/Documents/PythonPackages/SP/Gemini_B4_R400_Arcs_Master'
+                    print('master')
                 if Instrument == 'GMOSN':
                     if 'e2v DD CCD42-90' in Detector:
                         Master = '/Users/maximedevogele/Documents/PythonPackages/SP/GeminiN_B4_R400_e2vDD_Arcs_Master'
-                        print('e2v Detector for GMOSN')
+                    else: 
+                        Master = '/Users/maximedevogele/Documents/PythonPackages/SP/Gemini_B4_R400_Arcs_Master'
+                        print('master')
+                        
                 
                 with open(Master) as f:
                     Master_Arcs = f.read().splitlines()
@@ -1175,11 +1078,11 @@ def Wav_Cal2(Arc ,**kw):
                 data = Arc
                 data = data - np.nanmedian(data);
                 data = data / np.nanmean(data);
-        
+                
                 Lines = np.nanmedian(data[500:550,:],axis=0)
         
-                Lines = Lines[530:1000]
-                Master_Arcs = Master_Arcs[530:1000]
+                Lines = Lines[600:1000]
+                Master_Arcs = Master_Arcs[600:1000]
 
         print(len(Lines))
         print(len(Master_Arcs))
@@ -1187,7 +1090,11 @@ def Wav_Cal2(Arc ,**kw):
         LL = [Lines, Lines,Lines, Lines,Lines, Lines,Lines, Lines]
         LL2 = [Master_Arcs, Master_Arcs,Master_Arcs, Master_Arcs,Master_Arcs, Master_Arcs,Master_Arcs, Master_Arcs]
 
+        print(len(LL))
+        print(len(LL2)) 
         
+#        for elem in LL[1]:
+#            print(elem)
         
         result = ird.similarity(np.array(LL2), np.array(LL), numiter=3)
   
@@ -1205,7 +1112,7 @@ def Wav_Cal2(Arc ,**kw):
                     Wav = (x-886+result['tvec'][1])*-3.5461+12505 # -886 because during the extraction we go untill 2250 only and not the full line
                 else:
                     print(result['tvec'][1])
-                    Wav = (x-886+result['tvec'][1])*-3.9237+13149 # -886 because during the extraction we go untill 2250 only and not the full line
+                    Wav = (x-886+200+result['tvec'][1])*-3.9237+13149 # -886 because during the extraction we go untill 2250 only and not the full line
                     print(Wav)
         
 #        hdulist = fits.open(Master)
@@ -1232,74 +1139,6 @@ def Wav_Cal2(Arc ,**kw):
 
     return Wav
 
-def Wav_Cal(Arc, Disp = 150,**kw):
-    
-    ''' need to improve the function to work with any bin value and any R values ''' 
-    
-    if kw.has_key('Instrument'):
-        Instrument = kw['Instrument']
-    else:
-        Instrument = 'GMOS'     
-
-
-    if Instrument == 'Deveny':
-        print('Instrument = Deveny')
-        Master = '/Users/maximedevogele/Documents/PythonPackages/SP/Deveny_Arcs_Master'
-        with open(Master) as f:
-            Master_Arcs = f.read().splitlines()
-        Master_Arcs = np.array(Master_Arcs).astype(float)
-        Master_Arcs = Master_Arcs/39
-        
-        hdulist = fits.open(Arc)
-        data = hdulist[0].data
-        hdulist.close()
-        
-        
-        data = data - np.median(data);
-        data = data / np.mean(data);
-    
-        Lines = np.median(data[250:260,:],axis=0)
-        LL = [Lines, Lines,Lines, Lines,Lines, Lines,Lines, Lines]
-        LL2 = [Master_Arcs, Master_Arcs,Master_Arcs, Master_Arcs,Master_Arcs, Master_Arcs,Master_Arcs, Master_Arcs]
-        
-        result = ird.similarity(np.array(LL2), np.array(LL), numiter=3)
-        
-        x = np.array(range(2148))
-        Wav = (x+result['tvec'][1])*-4.277+11780
-        
-    if Instrument == 'GMOS':
-        if Disp == 150:
-            Master = '/Users/maximedevogele/Documents/Gemini/CuAr/Gemini_MasterArc_R150.fits'
-            WavCalFile = '/Users/maximedevogele/Documents/Gemini/CuAr/Wav_Cal_MasterArc_R150'
-        if Disp == 400:
-            Master = '/Users/maximedevogele/Documents/Gemini/CuAr/Gemini_MasterArc_R400.fits'
-            WavCalFile = '/Users/maximedevogele/Documents/Gemini/CuAr/Wav_Cal_MasterArc_R400'
-
-        hdulist = fits.open(Master)
-        Master_Arcs = hdulist[0].data
-        hdulist.close()
-        
-        WavCal = []
-        with open(WavCalFile) as f:
-             WavCal = [x.split() for x in f.readlines()]
-        WavCal = np.array(WavCal).astype(float)     
-        
-        hdulist = fits.open(Arc)
-        data = hdulist[0].data
-        hdulist.close()
-        
-        result = ird.similarity(Master_Arcs[990:1000,800:950], data[990:1000,800:950], numiter=3)
-        WavCalSci = copy.deepcopy(WavCal)
-        
-        z = np.polyfit((WavCalSci[:,0]-np.mean(WavCalSci[:,0]))/np.std(WavCalSci[:,0]),WavCalSci[:,1], 4)
-        p = np.poly1d(z)
-        
-        Xaxis = np.linspace(0,3132,3132)
-        Wav = p((Xaxis-np.mean(WavCalSci[:,0]))/np.std(WavCalSci[:,0]))
-
-    return Wav
-
-
 def Shift_Spec(Spectre,Wavel,**kw):
     
     if kw.has_key('Instrument'):
@@ -1316,7 +1155,7 @@ def Shift_Spec(Spectre,Wavel,**kw):
     print(Instrument)
     
     if Instrument == 'Deveny':
-        Inter = np.linspace(0.7500,0.7700,1000)
+        Inter = np.linspace(0.7100,0.7300,1000)
         
         f1 = interp1d(Wavel[0], Spectre[0])
         f2 = interp1d(Wavel[1], Spectre[1])
@@ -1325,7 +1164,7 @@ def Shift_Spec(Spectre,Wavel,**kw):
         diffY = []
         sub = np.linspace(-0.004,0.004,50000)
         for i in sub:
-            Inter2 = np.linspace(0.7500+i,0.7700+i,1000)
+            Inter2 = np.linspace(0.7100+i,0.7300+i,1000)
             New1 = f1(Inter2)
             New2 = f2(Inter)
             dev = np.nanstd(New1/New2)
@@ -1433,25 +1272,6 @@ def Divide_Spec(Spectra,Wavel):
     
 
 
-def Auto_Extract_Spec(bla):
-    
-    print(bla)
-    hdulist = fits.open(bla)
-    data = hdulist[1].data
-    dataC = Correct_Amplifier(data)
-    dataCC = Correct_Boxes(dataC)
-#    dataCC = dataC
-    Center = Detect_Spectra(dataCC)
-    Start = (685,Center)
-    Trace, bkg, MASK1 = Fit_Trace(dataCC,Start,Range = 400, SClip = True)
-    Spec1 = Extract_Spectrum(dataCC,Trace,bkg,FWHM=10,Mask = MASK1)
-    Wave1 = Extract_Wave(bla,Trace)
-    Spec1S = Sig_Clip_Spec(Spec1,n = 7, sig = 4)
-    Spec1N = Normalize_Spectrum(Spec1,Wave1,MASK1*Spec1S,wavelength=7000)
-    
-    return Wave1,Spec1N
-
-
 def Normalize_Spectrum(spec,wave,mask,wavelength=7000):
     
     condition1 = wave[mask] > wavelength
@@ -1518,33 +1338,6 @@ def Extract_Wave(name,Trace):
     return np.array(Wavelength)
     
     
-
-
-def Get_Wavtrans(name):
-    
-    hdulist = fits.open(name)
-    WavTransFile = hdulist[1].header['WAVTRAN']
-    
-    F = open('./database/fc' + WavTransFile ,'r')
-    
-    for i in range(14):
-        F.readline()
-    
-    CoeffTamp = []
-    Coeff = []
-    for i in range(16):
-        CoeffTamp = F.readline()
-        Coeff.append(float(CoeffTamp))
-    
-    Coeff = np.array(Coeff)
-    
-    XS,YS = np.meshgrid(np.linspace(-1,1,1044),np.linspace(1,-1,1566))
-    
-    
-    Wave = np.polynomial.chebyshev.chebval2d(YS,XS,Coeff.reshape((4,4),order='F'))
-    
-    return Wave
-
 def Detect_Spectra(data,Bin = 4,**kw):
     
     ###### Parse the argument sent through the function #######
@@ -1588,7 +1381,7 @@ def Detect_Spectra(data,Bin = 4,**kw):
     
     if Method == 'Maximum':
         
-        if Instrument == 'Deveny':
+        if Instrument == 'Deveny' or Instrument == 'Soar':
             
             xs = range(100,400)
             SS = np.median(data[100:400,1400:1430],axis=1)
@@ -1655,6 +1448,34 @@ def Detect_Spectra(data,Bin = 4,**kw):
             return coeff[4]+800
     
 
+def Lin_Interp(data_x,data_y,n_bin):
+    data_x = np.array(data_x).astype(float)
+    data_y = np.array(data_y).astype(float)
+    
+    New_vec_y = []
+    New_vec_x = []
+    for idx,elem in enumerate(data_x):
+        if idx == 0:
+            diff_y = 0
+            diff_x = 0
+            New_vec_x.append(data_x[idx])
+            New_vec_y.append(data_y[idx])
+            for elem2 in range(n_bin-1):
+                New_vec_y.append(data_y[idx])
+                New_vec_x.append(data_x[idx])
+        else:
+            diff_y = (data_y[idx]-data_y[idx-1])
+            diff_x = (data_x[idx]-data_x[idx-1])                
+            New_vec_x.append(data_x[idx-1])
+            New_vec_y.append(data_y[idx-1]/n_bin)
+            for elem2 in range(n_bin-1):
+                New_vec_y.append(data_y[idx-1]/n_bin+((diff_y/n_bin))/n_bin*(elem2+1))
+                New_vec_x.append(data_x[idx-1]+(diff_x/n_bin)*(elem2+1))
+
+    return New_vec_x,New_vec_y
+    
+
+
 def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
     
     
@@ -1681,6 +1502,75 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
         
         
     print(Instrument)    
+
+
+    if Instrument == 'Soar':
+    
+        x_size = np.shape(data)[1]
+        MASK = np.array(range(x_size), dtype=bool)  
+        MASK[:20] = False
+        MASK[2030:] = False
+        
+        Trace = np.array(range(x_size), dtype=np.float)
+        Trace[:] = 0.
+    
+        bkg = np.array(range(x_size), dtype=np.float)
+        bkg[:] = 0.        
+        
+        xs = range(int(Start[1])-Range,int(Start[1])+Range)
+        SS = data[xs,Start[0]]
+        
+        p0 = [0,np.max(SS),2.24,1.41,Start[1]]
+        
+        coeffIn, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0, SClip = SClip)
+
+        Trace[Start[0]] = float(coeffIn[4])
+
+        p0 = coeffIn
+        for i in range(Start[0],15,-1):
+            if i > 20 :
+                xs = range(int(p0[4])-Range,int(p0[4])+Range)
+                SS = np.median(data[xs,i-15:i+15],axis=1)
+                print(i)
+                coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
+                if coeff[4] < 0 or coeff[4] > 2030:
+                    coeff = p0
+                MASK[i] = Mask
+                Trace[i] = float(coeff[4])
+                bkg[i] = coeff[0]
+                if coeff[4] < 500 and coeff[4] > 12:
+                    p0 = coeff
+
+        p0 = coeffIn
+        for i in range(Start[0],2030,1):
+            xs = range(int(p0[4])-Range,int(p0[4])+Range)
+            SS = np.median(data[xs,i-15:i+15],axis=1)
+            print(i)
+            coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn,SClip = SClip)
+            if coeff[4] < 0 or coeff[4] > 2000:
+                coeff = p0
+            MASK[i] = Mask
+            Trace[i] = float(coeff[4])
+            bkg[i] = coeff[0]
+            p0 = coeff
+
+    #    MASK[CHIP_GAP[1][0]:CHIP_GAP[1][1]] = False
+        Xind = np.array(range(x_size))    
+        
+        Pol = np.polyfit(Xind[MASK], Trace[MASK], 5)
+        p = np.poly1d(Pol)
+        Tr = p(range(x_size))
+        
+        plt.figure()
+    
+        plt.plot(Xind[MASK],Trace[MASK])
+        plt.plot(Xind[MASK],Tr[MASK])
+        plt.figure()
+        plt.plot(Xind[MASK],bkg[MASK])
+
+        return Trace, bkg, MASK 
+
+
     
     if Instrument == 'Deveny':
     
@@ -1773,19 +1663,24 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
                 bkg = np.array(range(1555), dtype=np.float)
                 bkg[:] = 0. 
             if 'Hamamatsu' in Detector:   
-                MASK = np.array(range(1555), dtype=bool) 
+                MASK = np.array(range(1562), dtype=bool) 
                 MASK[CHIP_GAP_B4[0][0]:CHIP_GAP_B4[0][1]] = False
         
-                Trace = np.array(range(1555), dtype=np.float)
+                Trace = np.array(range(1562), dtype=np.float)
                 Trace[:] = 0.
     
-                bkg = np.array(range(1555), dtype=np.float)
+                bkg = np.array(range(1562), dtype=np.float)
                 bkg[:] = 0.
         
-        xs = range(int(Start[1])-Range,int(Start[1])+Range)
-        SS = data[xs,Start[0]]
+        New_xs = range(int(Start[1])-Range,int(Start[1])+Range)
+
+        New_SS = data[New_xs,Start[0]]
+        
+        xs, SS = Lin_Interp(New_xs,New_SS,10)
+
         
         p0 = [0,np.max(SS),2.24,1.41,Start[1]]
+        
         
         coeffIn, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0, SClip = SClip)
         
@@ -1795,8 +1690,10 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
             p0 = coeffIn
             for i in range(Start[0],15,-1):
                 if i > 1050 or i < 1020 and i > 300 :
-                    xs = range(int(p0[4])-Range,int(p0[4])+Range)
-                    SS = np.median(data[xs,i-15:i+15],axis=1)
+                    New_xs = range(int(p0[4])-Range,int(p0[4])+Range)
+                    New_SS = np.median(data[New_xs,i-15:i+15],axis=1)
+                    SS = Lin_Interp(New_SS,10)
+
                     print(i)
                     coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
                     if coeff[4] < 0 or coeff[4] > 2000:
@@ -1808,10 +1705,11 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
              
             p0 = coeffIn
             for i in range(Start[0],2250,1):
-                if i > 2100 or i < 2070:
+                if i > 2100 or i < 2050:
                     print(i)
-                    xs = range(int(p0[4])-Range,int(p0[4])+Range)
-                    SS = np.median(data[xs,i-15:i+15],axis=1)
+                    New_xs = range(int(p0[4])-Range,int(p0[4])+Range)
+                    New_SS = np.median(data[New_xs,i-15:i+15],axis=1)
+                    xs, SS = Lin_Interp(New_xs,New_SS,10)
                     coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn,SClip = SClip)
                     if coeff[4] < 0 or coeff[4] > 2000:
                         coeff = p0
@@ -1823,8 +1721,9 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
         if Binning == '4':
             p0 = coeffIn
             for i in range(Start[0],15,-1):
-                xs = range(int(p0[4])-Range,int(p0[4])+Range)
-                SS = np.median(data[xs,i-15:i+15],axis=1)
+                New_xs = range(int(p0[4])-Range,int(p0[4])+Range)  
+                New_SS = np.median(data[New_xs,i-15:i+15],axis=1)
+                xs, SS = Lin_Interp(New_xs,New_SS,10)
                 print(i)
                 coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
                 if coeff[4] < 0 or coeff[4] > 2000:
@@ -1837,15 +1736,16 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
             p0 = coeffIn
             for i in range(Start[0],1500,1):
                 print(i)
-                xs = range(int(p0[4])-Range,int(p0[4])+Range)
-                SS = np.median(data[xs,i-15:i+15],axis=1)
+                New_xs = range(int(p0[4])-Range,int(p0[4])+Range)
+                New_SS = np.median(data[New_xs,i-15:i+15],axis=1)
+                xs, SS = Lin_Interp(New_xs,New_SS,10)
                 coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn,SClip = SClip)
-                if coeff[4] < 0 or coeff[4] > 2000:
+                if coeff[4] < 0 or coeff[4] > 1050:
                     coeff = p0
                 MASK[i] = Mask
                 Trace[i] = float(coeff[4])
                 bkg[i] = coeff[0]
-                p0 = coeff            
+                p0 = coeff    
     
     
         if Binning == '2':
@@ -1908,7 +1808,7 @@ def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
     
     
     
-    if Instrument == 'Deveny':
+    if Instrument == 'Deveny' or Instrument == 'Soar':
         
         if len(Mask) == 0:
             Mask = np.ones(x_size, dtype=bool)
@@ -1935,7 +1835,7 @@ def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
                 if Instrument == 'GMOSS':
                     Mask = np.ones(1562, dtype=bool)
                 if Instrument == 'GMOSN':
-                    Mask = np.ones(1555, dtype=bool)
+                    Mask = np.ones(1562, dtype=bool)
         
         Spec = []
         if Binning == '2':
@@ -1945,10 +1845,16 @@ def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
         if Binning == '4':
             if Instrument == 'GMOSS':
                 for i in range(1562):
-                    Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]- bkg[i]
-                    Spec.append(sum(Sec))      
+                    if Trace.astype(int)[i] < 10:
+                        Trace[i] = 100
+                    Sec = data[Trace.astype(int)[i]-(FWHM*2):Trace.astype(int)[i]+(FWHM*2)+1,i]- bkg[i]
+                    New_xs, SS = Lin_Interp(range(Trace.astype(int)[i]-(FWHM*2),Trace.astype(int)[i]+(FWHM*2)+1),Sec,10)
+                    cond1 = New_xs<Trace[i]+FWHM
+                    cond2 = New_xs>Trace[i]-FWHM
+                    Cond = cond1*cond2
+                    Spec.append(sum(SS*Cond))    
             if Instrument == 'GMOSN':
-                for i in range(1555):
+                for i in range(1562):
                     Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]- bkg[i]
                     Spec.append(sum(Sec))          
         
@@ -2004,9 +1910,11 @@ def Sigma_Clip(data, sig = 3):
         Cond_Tamp1 = 0
         Cond_Tamp2 = 0
         
+        Counter = 0
+        
         while Cond1 != Cond_Tamp1 or Cond2 != Cond_Tamp2:
             
-            
+            Counter +=1
             Cond_Tamp1 = Cond1
             Cond_Tamp2 = Cond2
             
@@ -2014,7 +1922,9 @@ def Sigma_Clip(data, sig = 3):
             
             Cond1 = ma.median(data) - np.std(data)*sig
             Cond2 = ma.median(data) + np.std(data)*sig
-            
+
+            if Counter < 100:
+                return data            
         return data
         
     else:   
@@ -2026,8 +1936,11 @@ def Sigma_Clip(data, sig = 3):
     
         Cond_Tamp1 = 0
         Cond_Tamp2 = 0
+        
+        Counter = 0
         while Cond1 != Cond_Tamp1 or Cond2 != Cond_Tamp2:
             
+            Counter +=1
             
             Cond_Tamp1 = Cond1
             Cond_Tamp2 = Cond2
@@ -2039,160 +1952,10 @@ def Sigma_Clip(data, sig = 3):
             
             Cond1 = np.median(data[SIG_CLIP]) - np.std(data[SIG_CLIP])*sig
             Cond2 = np.median(data[SIG_CLIP]) + np.std(data[SIG_CLIP])*sig
+            if Counter < 100:
+                return SIG_CLIP
     
         return SIG_CLIP    
-
-def Correct_Boxes(data):
-    
-    B1x1 = 904
-    B1x2 = 970
-    
-    B2x1 = 973
-    B2x2 = 1028
-    
-    
-    Cons = Detect_Boxes(data)
-    
-    for List in Cons:
-        print(List)
-    
-        XSize = len(List) + 1
-        YSize1 = B1x2-B1x1
-        YSize2 = B2x2-B2x1
-        
-        
-        X1 = []
-        X2 = []
-        Y1 = [] 
-        Y2 = []
-        
-        X1, Y1 = np.meshgrid(range(XSize), range(YSize1), sparse=False, indexing='ij')
-        X2, Y2 = np.meshgrid(range(XSize), range(YSize2), sparse=False, indexing='ij')
-    
-        X1 = X1.flatten()
-        Y1 = Y1.flatten()
-    
-        X2 = X2.flatten()
-        Y2 = Y2.flatten()
-    
-        Z1 = []
-        Z2 = []
-        
-        Z1 = data[List[0]-1:List[-1]+1,B1x1:B1x2]
-        Z2 = data[List[0]-1:List[-1]+1,B2x1:B2x2]
-        
-        ZC1 = Sigma_Clip(Z1, sig = 2.5)
-        ZC2 = Sigma_Clip(Z2, sig = 2.5)
-        
-#        ZCC1 = Sigma_Clip(Z1, sig = 3)
-#       ZCC2 = Sigma_Clip(Z2, sig = 3)
-        
-    
-        A1 = np.array([X1*0+1, X1, Y1, X1*Y1]).T
-        A2 = np.array([X2*0+1, X2, Y2, X2*Y2]).T
-        
-        B1 = Z1.flatten()
-        B2 = Z2.flatten()
-        
-        C1 = ZC1.flatten()
-        C2 = ZC2.flatten()
-        
-        Index1 = [i for i, x in enumerate(C1) if x]
-        Index2 = [i for i, x in enumerate(C2) if x]
-    
-    
-        coeff1, r, rank, s = np.linalg.lstsq(A1[Index1], B1[Index1])
-        coeff2, r, rank, s = np.linalg.lstsq(A2[Index2], B2[Index2])
-    
-        ZZ1 = []
-        ZZ1 = np.empty((XSize,YSize1), dtype=float)
-        for i in range(XSize):
-            for j in range(YSize1):
-                ZZ1[i,j] = coeff1[0]+coeff1[2]*j + coeff1[1]*i+coeff1[3]*i*j
-                
-        data[List[0]-1:List[-1]+1,B1x1:B1x2] -= ZZ1    
-    
-        ZZ2 = [] 
-        ZZ2 = np.empty((XSize,YSize2), dtype=float)
-        for i in range(XSize):
-            for j in range(YSize2):
-                ZZ2[i,j] = coeff2[0]+coeff2[2]*j + coeff2[1]*i+coeff2[3]*i*j
-    
-        data[List[0]-1:List[-1]+1,B2x1:B2x2] -= ZZ2
-    
-    return data
-
-def Detect_Boxes(data):
-
-    B = range(120)
-    B = np.array(B)
-    B[0]=0
-    B[-1]=0
-    B[1:-1] = 1 
-    
-    TT = []
-
-    for i in range(1044):
-        c = data[i,902:1022]
-        SIG = Sigma_Clip(c)
-        
-        M1 = data[i,800:850]
-        M2 = data[i,1100:1140]
-        
-#        MS1 = Sigma_Clip(M1)
-#        MS2 = Sigma_Clip(M2)
-        
-        M = (np.median(data[i,800:850])+np.median(data[i,1100:1140]))/2
-        c = c/(abs(M)+1)
-        TT.append( abs( np.median(np.convolve(c[SIG], B)) ) )
-        
-    PREUP = np.median(TT)+0.5*np.std(TT)
-    PRESUP = TT > PREUP
-        
-    
-    Indices = []
-    for i in range(1044):
-        if PRESUP[i]:
-            Indices.append(i)
-    #        aa = savitzky_golay(dataC[i,902:1040],11,2)
-    #        dataCC[i,902:1040] = dataC[i,902:1040] - aa
-            #dataC[i,902:1040] - TEST[i]    
-    
-
-    Cons = group_consecutives(Indices)
-    
-    Consec = []
-    for i in Cons:
-        if len(i)>1:
-            Consec.append(i)    
-    
-    
-    return Consec
-
-
-
-    
-    
-
-def Correct_Amplifier(data):
-    
-#    data[:,1029:1058] = 0 
-    
-    for col in range(1566):
-        c = data[:,col]
-        
-        SIG = Sigma_Clip(c)
-                
-        filtered = c*SIG
-        
-        z = np.polyfit(range(1044), filtered, 7)
-        p = np.poly1d(z)
-        
-        Fitted = p(range(1044))
-        
-        data[:,col] = c - Fitted
-        
-    return data
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
      import numpy as np
@@ -2271,7 +2034,7 @@ def Fit_MOFFAT(xs,ys, p0,p_error = [],SClip = True, Conv = 0):
     
     if SClip == True:
         Res = ys - fit
-        ResS = Sigma_Clip(Res)
+        ResS = Sigma_Clip(Res,sig =5)
         LT = [i for i, x in enumerate(ResS) if not x]
         if len(LT) != 0:
             coeff, fit, FWHM, MASK, xs = Fit_MOFFAT(xs[ResS],ys[ResS], p0,p_error = [],SClip = True)
@@ -2281,843 +2044,3 @@ def Fit_MOFFAT(xs,ys, p0,p_error = [],SClip = True, Conv = 0):
 
 def PolyXY(P,x,y,data):
     return data - P[0]+x*P[1]+y*P[2]+x*y*P[3]
-
-def Display(name):
-    iraf.set(stdimage='imtgmos2')
-    gmos.gdisplay(name)
-
-
-def Create_Query(IND_KEY = [7,3,4,5,6],IND_COND = []):
-        
-        
-    SQL_Query =  'SELECT '
-    for ind in IND_KEY:
-        SQL_Query = SQL_Query + KEY_LIST[ind] +','
-    SQL_Query = SQL_Query[0:-1] 
-    SQL_Query = SQL_Query + ' FROM obslog '
-    
-    
-    if IND_COND:
-        SQL_Query = SQL_Query + 'WHERE '
-        for ind in IND_COND:
-            SQL_Query = SQL_Query + KEY_LIST[ind] +'=? '
-            SQL_Query = SQL_Query + 'AND ' 
-        SQL_Query = SQL_Query[:-4]
-        
-    return SQL_Query
-
-
-def Create_database(raw = 'raw', Database = 'obsLog.sqlite3'):
-    
-    print("=== Creating Observer log file===")    
-    
-    os.system('python /Users/maximedevogele/Documents/Gemini/obslog2.py' + ' ' + Database + ' ' + raw + '/')    
-
-
-
-def Get_From_database(**kw):
-    
-    '''
-        Allow to display the information contain in the file database
-        
-        Arguments:      Type                default values
-            dbFile      String              './raw/obsLog.sqlite3'  File containing the database
-            IND_KEY     List of integers    [7,3,4,5,6]             Keys to display
-            IND_COND    List of integers    []                      Keys to put conditions
-            VALUE_COND  Tupple of Strings   ()                      Conditions on the keys
-            
-        Keys:
-            [0]     obs_id
-            [1]     use_me
-            [2]     N_ext
-            [3]     File
-            [4]     DateObs
-            [5]     TimeObs
-            [6]     Instrument
-            [7]     Object
-            [8]     RA
-            [9]     Dec
-            [10]    ObsType
-            [11]    ObsClass
-            [12]    CcdBin
-            [13]    RoI
-            [14]    NodMode
-            [15]    NS_Shift
-            [16]    NS_Cycles
-            [17]    DTA_Xoffset
-            [18]    Filter1
-            [19]    Filter2
-            [20]    Disperser
-            [21]    AperMAsk
-            [22]    MaskType
-            [23]    Rotator
-            [24]    CentWave
-            [24]    T_exp
-            [26]    Airmass
-            [27]    Quality
-            [28]    Xoffset            
-            [29]    Yoffset
-
-            
-        Examples:   
-            Display_database() 
-                Uses default values and display keys 
-                7 the Object,3 the file name,4 the date of observation,
-                5 the time of observation, and 6 the Instrument used
-            
-            Display_database(Ind_Keys = [0,1,2,3])  
-                displays only the keys 1,2,3,4
-            
-            Display_database(Ind_Keys = [0,1,2,3], IND_COND = [7], VALUE_COND = (2017 QB,) : 
-                displays only the keys 1,2,3,4 and only entries where the object is 2017 QB
-            
-    '''
-    
-    
-    
-    
-    # Define the default value for the query to the database
-    defaults = dict(dbFile = './raw/obsLog.sqlite3',
-                    IND_KEY = [7,3,4,5,6],
-                    IND_COND = [],
-                    VALUE_COND = ()
-                    )   
-     
-    # If parameter has not been provided by the user,
-    # assign the defaults values to the kw dictionary
-    for key in defaults.keys():
-        if not kw.has_key(key):
-            kw[key] = defaults[key]
-
-    dbFile = kw.get('dbFile')    
-    IND_KEY = kw.get('IND_KEY')
-    IND_COND = kw.get('IND_COND')
-    VALUE_COND = kw.get('VALUE_COND')
-    
-    
-    SQL_Query = Create_Query(IND_KEY = IND_KEY,IND_COND = IND_COND)
-    
-
-    db = sqlite3.connect(dbFile)
-    c = db.cursor()
-    c.execute(SQL_Query, VALUE_COND)
-    all_rows = c.fetchall()
-    
-    PRINT_STRING = ''
-    for number in range(len(IND_KEY)):
-        PRINT_STRING = PRINT_STRING + '{' + str(number) + '} '
-        
-    #Header = [KEY_LIST[i] for i in IND_KEY]
-
-    return all_rows
-    
-    db.close()
-
-
-def Display_database(**kw):
-    
-    '''
-        Allow to display the information contain in the file database
-        
-        Arguments:      Type                default values
-            dbFile      String              './raw/obsLog.sqlite3'  File containing the database
-            IND_KEY     List of integers    [7,3,4,5,6]             Keys to display
-            IND_COND    List of integers    []                      Keys to put conditions
-            VALUE_COND  Tupple of Strings   ()                      Conditions on the keys
-            
-        Keys:
-            [0]     obs_id
-            [1]     use_me
-            [2]     N_ext
-            [3]     File
-            [4]     DateObs
-            [5]     TimeObs
-            [6]     Instrument
-            [7]     Object
-            [8]     RA
-            [9]     Dec
-            [10]    ObsType
-            [11]    ObsClass
-            [12]    CcdBin
-            [13]    RoI
-            [14]    NodMode
-            [15]    NS_Shift
-            [16]    NS_Cycles
-            [17]    DTA_Xoffset
-            [18]    Filter1
-            [19]    Filter2
-            [20]    Disperser
-            [21]    AperMAsk
-            [22]    MaskType
-            [23]    Rotator
-            [24]    CentWave
-            [24]    T_exp
-            [26]    Airmass
-            [27]    Quality
-            
-        Examples:   
-            Display_database() 
-                Uses default values and display keys 
-                7 the Object,3 the file name,4 the date of observation,
-                5 the time of observation, and 6 the Instrument used
-            
-            Display_database(Ind_Keys = [0,1,2,3])  
-                displays only the keys 1,2,3,4
-            
-            Display_database(Ind_Keys = [0,1,2,3], IND_COND = [7], VALUE_COND = (2017 QB,) : 
-                displays only the keys 1,2,3,4 and only entries where the object is 2017 QB
-            
-    '''
-    
-    
-    
-    
-    # Define the default value for the query to the database
-    defaults = dict(dbFile = './raw/obsLog.sqlite3',
-                    IND_KEY = [7,3,4,5,6],
-                    IND_COND = [],
-                    VALUE_COND = ()
-                    )   
-     
-    # If parameter has not been provided by the user,
-    # assign the defaults values to the kw dictionary
-    for key in defaults.keys():
-        if not kw.has_key(key):
-            kw[key] = defaults[key]
-
-    dbFile = kw.get('dbFile')    
-    IND_KEY = kw.get('IND_KEY')
-    IND_COND = kw.get('IND_COND')
-    VALUE_COND = kw.get('VALUE_COND')
-    
-    
-    SQL_Query = Create_Query(IND_KEY = IND_KEY,IND_COND = IND_COND)
-    
-
-    db = sqlite3.connect(dbFile)
-    c = db.cursor()
-    c.execute(SQL_Query, VALUE_COND)
-    all_rows = c.fetchall()
-    
-    PRINT_STRING = ''
-    for number in range(len(IND_KEY)):
-        PRINT_STRING = PRINT_STRING + '{' + str(number) + '} '
-        
-    Header = [KEY_LIST[i] for i in IND_KEY]
-    print(PRINT_STRING.format(*Header))
-    for row in all_rows:
-        print(PRINT_STRING.format(*row))
-
-    db.close()
-
-
-def Get_ObjectList(dbFile = './raw/obsLog.sqlite3'):
-    
-    qr = {'use_me':1,
-           'Object':'*'}
-    
-    ObjectList = list(set(fs.objectListQuery(dbFile,fs.createQuery('object', qr, Date = False),qr)))
-
-    print(ObjectList)
-    
-    return ObjectList
-
-def Get_DateList(dbFile = './raw/obsLog.sqlite3'):
-    
-    qr = {'use_me':1,'Object':'*',
-           'DateObs':''}
-    
-    DateList = list(set(fs.dateListQuery(dbFile,fs.createQuery('dateobs', qr, Date = False),qr)))
-    
-    print('The targets were observed on the: \n')
-    for i in DateList: print(str(i))
-    print('\n')
-    
-    return DateList
-    
-    
-def Get_BinList(dbFile = './raw/obsLog.sqlite3'):
-    
-    qr = {'use_me':1,'Object':'*',
-           'DateObs':'','CentWave':''}
-    
-    BinList = list(set(fs.ccdbinListQuery(dbFile,fs.createQuery('ccdbin', qr, Date = False),qr)))
-   
-    print(BinList)
-
-    return BinList
-
-
-def Get_ObjectsFileList(dbFile = './raw/obsLog.sqlite3'):
-    
-    ObjList = Get_ObjectList()
-    
-    ObjFileList={}
-    for Object in ObjList:
-        qr = {'use_me':1,
-              'Object':Object,
-              'DateObs':''}
-        ObjectFileList = list(set(fs.fileListQuery(dbFile,fs.createQuery('sciSpecSimp', qr, Date = False),qr)))
-        ObjFileList[Object] = ObjectFileList
-    
-    print(ObjFileList)
-
-    return ObjFileList
-    
-    
-def gmos_asteroids_proc():
-    '''
-    GMOS Data Reduction Cookbook for Asteroid spectroscopy
-    '''
-
-    print("### Begin Processing GMOS/Longslist ###")
-    print("###")
-           
-           
-    print("=== Creating Observer log file===")    
-    
-    os.system('python /Users/maximedevogele/Documents/Gemini/obslog2.py obsLog.sqlite3 ' + 'raw/')    
-    
-    dbFile= './raw/obsLog.sqlite3'
-     
-    qd = {'Objects':{'use_me':1,
-           'Instrument':'GMOS-S','CcdBin':'','RoI':'Full',
-           'Disperser':'R400+_%','CentWave':700.0,'AperMask':'2.0arcsec',
-           'Object':'*',
-           'DateObs':''}}
-    
-    
-    qr = qd['Objects']
-    ObjectList = list(set(fs.objectListQuery(dbFile,fs.createQuery('object', qr, Date = False),qr)))
-    
-    print('the observed object are: \n')
-    for i in ObjectList: print(str(i))
-    print('\n')
-    
-
-    DateList = list(set(fs.dateListQuery(dbFile,fs.createQuery('dateobs', qr, Date = False),qr)))
-    
-    print('The targets were observed on the: \n')
-    for i in DateList: print(str(i))
-    print('\n')
-
-
-    BinList = list(set(fs.ccdbinListQuery(dbFile,fs.createQuery('ccdbin', qr, Date = False),qr)))
-    
-    print("=== Creating MasterCals ===")   
-    
-    
-    
-    qd['Objects'].update({'CcdBin':str(BinList[0])})
-    DateObs = str(DateList[0]) + ':' + str(DateList[-1])
-    qd['Objects'].update({'DateObs':DateObs})
-            
-    qr = qd['Objects']
-    BiasList =  list(set(fs.fileListQuery(dbFile,fs.createQuery('bias', qr, Date = False),qr)))
-
-
-    if len(BiasList) == 0:
-        sys.exit('ERROR: There is no BIAS files provided')
-        
-    
-
-    print('The selected bias are: \n')
-    for i in BiasList: print(str(i))
-    print('\n')
-    
-    
-    
-    gemtools.gemextn.unlearn()    # Disarm a bug in gbias
-    gmos.gbias.unlearn()
-    
-    
-    biasFlags = {
-        'logfile': 'biasLog.txt','rawpath':'','fl_vardq':'yes',
-        'verbose':'no'
-    }
-
-    print(" --Creating Bias MasterCal-- \n")
-    
-    if not 'bias' in str(BiasList):
-    
-        gmos.gbias(','.join(str(x) for x in BiasList),'MCbias', 
-                       **biasFlags)
-        BiasName = 'MCbias'
-    else:
-        Splt = BiasList[0].split('/')
-        BiasName = str(Splt[-1])
-            
-    
-    
-    print(" -- Creating GCAL Spectral Flat-Field MasterCals -- \n")
-    
-    Dispersers =  list(set(fs.disperserListQuery(dbFile,fs.createQuery('disperser', qr, Date = False),qr)))
-    
-    print('The used disperser is: \n')
-    for i in Dispersers: print(str(i))
-    print('\n')
-    
-    qd['Objects'].update({'Disperser':Dispersers[0]})
-    qr = qd['Objects']
-    
-    CentWave =  list(set(fs.centwaveListQuery(dbFile,fs.createQuery('centwave', qr, Date = False),qr)))
-    
-    
-    print('The central wavelength are:')
-    print(CentWave)
-
-    counter = 0
-    ObjFullList={}
-    counter2 = 0
-    for r in CentWave:
-                
-        qd['Objects'].update({'CentWave':r})
-        
-        qr = qd['Objects']
-        
-        print('The flat file list is:')
-        FlatList = list(set(fs.fileListQuery(dbFile,fs.createQuery('gcalFlat', qr, Date = False),qr)))
-        print(FlatList)
-    
-    
-        FlatFlags = {
-                'logfile':'biasLog.txt','rawpath':'','fl_vardq':'yes',
-                'verbose':'no', 'bias': BiasName
-                }   
-    
-        for Files in FlatList:
-            counter += 1
-            gmos.gsflat(Files, 'MFlat' + str(counter) ,**FlatFlags)
-        
-        iraf.imdel('gS*.fits,gsS*.fits')
-        
-        
-        TimeFlat = list(set(fs.timeListQuery(dbFile,fs.createQuery('timeflat', qr, Date = False),qr)))
-        
-        HourFlat = []
-        for time in TimeFlat:
-            time = str(time)
-            time = time.split(':')
-            HourFlat.append(float(time[0])+float(time[1])/60+float(time[2])/3600)
-            
-
-
-        ArcList = list(set(fs.fileListQuery(dbFile,fs.createQuery('arc', qr, Date = False),qr)))
-        
-        print('The arc file list is:')
-        print(ArcList)
-        
-        TimeArc = list(set(fs.timeListQuery(dbFile,fs.createQuery('timearc', qr, Date = False),qr)))
-        
-        ArcTime = str(TimeArc[0])
-        ArcTime = ArcTime.split(':')
-        ArcHour = float(ArcTime[0])+float(ArcTime[1])/60+float(ArcTime[2])/3600
-
-        DiffTime = []
-        for flattime in HourFlat:
-            DiffTime.append(abs(ArcHour-flattime))
-            
-        min_index, min_value = min(enumerate(DiffTime), key=operator.itemgetter(1))
-        
-        print(len(FlatList))
-        Flat_To_Use = 'MFlat' + (str(min_index+1+counter-len(FlatList)))
-        
-        print('The flat to use is:')
-        print(Flat_To_Use)               
-
-        OutFileList = []
-
-        for i in ArcList:
-            splt = i.split('/')
-            OutFileList.append(splt[-1] + 'Gred') 
-
-        OutImage = ','.join(str(x) for x in OutFileList)
-        ListToProcess = ','.join(str(x) for x in ArcList)
-        
-        ReducFlags = {'inimages': ListToProcess, 'bias': BiasName, 
-                          'flatim': Flat_To_Use, 'fl_cut' : 'no','outim': OutImage,
-                          'fl_crsp': 'no'}   
-           
-        
-        gmos.gsreduce(**ReducFlags)
-
-        OutIm = OutImage.split('/')
-        
-        print('The splitted outim is:' )
-        print(OutIm)
-                
-        waveFlags = {
-        'coordlist':'gmos$data/CuAr_GMOS.dat','grating':'gmos$data/GMOSgratings.dat',
-        'fwidth':10,'nsum':10,'filterd':'gmos$data/GMOSfilters.dat',
-        'function':'chebyshev','order':4,'database':'database',
-        'fl_inter':'no','logfile':'gswaveLog.txt','verbose':'no'
-        }
-        
-        gmos.gswave(OutIm[-1], **waveFlags)
-
-        print(ObjectList)
-        
-        for obj in ObjectList:
-            
-            qd['Objects'].update({'Object':obj})
-            qr = qd['Objects']
-            
-            ObjectFileList = list(set(fs.fileListQuery(dbFile,fs.createQuery('sciSpec', qr, Date = False),qr)))
-            print(ObjectFileList)
-            ObjectTimeList = list(set(fs.timeListQuery(dbFile,fs.createQuery('timespec', qr, Date = False),qr)))       
-            print(ObjectTimeList)
-            
-            if len(ObjectFileList) != 0:
-                
-                ObjTime = str(ObjectTimeList[0])
-                ObjTime = ObjTime.split(':')
-                ObjHour = float(ObjTime[0])+float(ObjTime[1])/60+float(ObjTime[2])/3600
-                
-                DiffTime = []
-                for flattime in HourFlat:
-                    DiffTime.append(abs(ObjHour-flattime))
-                
-                min_index, min_value = min(enumerate(DiffTime), key=operator.itemgetter(1))
-                print(min_index, min_value)
-                
-                Flat_To_Use = 'MFlat' + (str(min_index+1+counter-len(FlatList)))
-                print('The flat to be used is' )
-                print(Flat_To_Use)           
-                
-                ListToProcess = ','.join(str(x) for x in ObjectFileList)
-                
-    
-    
-                FullFileListPre = []
-                for i in ObjectFileList:
-                    splt = i.split('/')
-                    FullFileListPre.append(splt[-1] + 'Gred' + 'Extrac') 
-    
-                FullListFiles = ','.join(str(x) for x in FullFileListPre)
-    
-                if counter2 == 0:
-                    ObjFullList[obj] = {r:''}
-                ObjFullList[obj][r] = FullListFiles
-    
-    
-    
-    
-                
-                OutFileList = []
-                for i in ObjectFileList:
-                    splt = i.split('/')
-                    OutFileList.append(splt[-1] + 'Gred') 
-                
-                
-                OutImage = ','.join(str(x) for x in OutFileList)
-                
-                
-                '''
-                for cut in ObjectFileList:
-                    ToOpen = './' + cut + '.fits'
-                    print(ToOpen)
-                    hdulist = fits.open(str(ToOpen))
-                    for l in range(len(hdulist)-1):
-                        hdulist[l+1].data[620:-1,:]= 0
-                        hdulist[l+1].data[0:490,:]= 0
-                    ToWrite = './' + cut + 'Cut.fits'
-                    hdulist.writeto(ToWrite)                
-                
-                '''
-                
-                ListToProcess = ','.join(str(x) for x in ObjectFileList)
-                
-                print(ListToProcess)
-                
-                
-                ReducFlags = {'inimages': ListToProcess, 'bias': BiasName, 
-                              'flatim': Flat_To_Use, 'fl_cut' : 'no','outim': OutImage,
-                              'fl_title': 'no','fl_crsp': 'yes'}   
-                
-                
-                
-                gmos.gsreduce(**ReducFlags)
-                
-                OutFileList2 = []
-                for i in OutFileList:
-                    OutFileList2.append(i + 'Trans') 
-                
-                
-                ListOut = ','.join(str(x) for x in OutFileList2)
-                
-                TransformFlags  = {'inimages': OutImage, 'outim': ListOut,
-                              'wavtraname': OutIm[0] }   
-                
-                gmos.gstransform(**TransformFlags)
-                
-                
-                print(OutFileList)
-                
-                iraf.gemarith(OutFileList2[0],'-',OutFileList2[1],OutFileList[0] + 'Diff')
-                iraf.gemarith(OutFileList2[1],'-',OutFileList2[2],OutFileList[1] + 'Diff')
-                iraf.gemarith(OutFileList2[2],'-',OutFileList2[1],OutFileList[2] + 'Diff')
-                if len(OutFileList2) == 4:
-                    iraf.gemarith(OutFileList2[3],'-',OutFileList2[1],OutFileList[3] + 'Diff')
-                if len(OutFileList2) == 5:
-                    iraf.gemarith(OutFileList2[4],'-',OutFileList2[1],OutFileList[4] + 'Diff')
-                    iraf.gemarith(OutFileList2[3],'-',OutFileList2[1],OutFileList[3] + 'Diff')
-
-                    
-                
-                for k in OutFileList:
-                    gmos.gsextract((k + 'Diff'), outim= k + 'Extrac', background='fit',
-                                   long_bsample="-35:-15,15:35", fl_inter = 'no')
-        
-        counter2 += 1
-    print(ObjFullList)
-    
-    for Obj in ObjFullList:
-        FileToComb = []
-        for CentWav in ObjFullList[Obj]:
-            FileToComb.append(str(ObjFullList[Obj][CentWav]))
-        iraf.gemscombine(FileToComb[0] + ',' + FileToComb[1] ,Obj)
-        print(FileToComb)
-        
-        
-    
-        
-    
-    
-    
-    
-   # gmos.gemscombine im119tde,im120tde,im121tde,im128tde,im129tde,im130tde out=2017RS2
-       # TimeObs = list(set(fs.timeListQuery(dbFile,fs.createQuery('timeflat', qr, Date = True),qr)))
-
-        
-        
-        
-        
-    
-    
-    
-    
-#    os.chdir(Folder)
-           
-           
-    '''          
-    print ("=== Creating MasterCals ===")
-
-    # This whole example depends upon first having built an sqlite3 database of metadata:
-    #    cd ./raw
-    #    python obslog.py obsLog.sqlite3
-    dbFile='./raw/obsLog.sqlite3'
-
-    # From the work_directory:
-    # Create the query dictionary of essential parameter=value pairs.
-    # Select bias exposures within ~2 months of the target observations:
-    qd = {'Full':{'use_me':1,
-           'Instrument':'GMOS-S','CcdBin':'2 4','RoI':'Full',
-           'Disperser':'B600+_%','CentWave':485.0,'AperMask':'1.0arcsec',
-           'Object':'AM2306-72%',
-           'DateObs':'2007-06-05:2007-07-07'}
-          }
-    # Make another copy for the CenterSpec RoI:
-    qd['CenSp'] = copy.deepcopy(qd['Full'])
-    qd['CenSp'].update({'RoI':'CentSp','Object':'LTT9239'})
-
-    print (" --Creating Bias MasterCal--")
-
-    # Set the task parameters.
-    gemtools.gemextn.unlearn()    # Disarm a bug in gbias
-    gmos.gbias.unlearn()
-    biasFlags = {
-        'logfile':'biasLog.txt','rawpath':'./raw/','fl_vardq':'yes',
-        'verbose':'no'
-    }
-    regions = ['Full','CenSp']
-    for r in regions:
-        # The following SQL generates the list of full-frame files to process.
-        SQL = fs.createQuery('bias', qd[r])
-        biasFiles = fs.fileListQuery(dbFile, SQL, qd[r])
-
-        # The str.join() funciton is needed to transform a python list into a 
-        # comma-separated string of file names that IRAF can understand.
-        if len(biasFiles) > 1:
-            gmos.gbias(','.join(str(x) for x in biasFiles), 'MCbias'+r, 
-                       **biasFlags)
-
-    # Clean up
-    iraf.imdel("gS2007*.fits")
-
-    print (" -- Creating GCAL Spectral Flat-Field MasterCals --")
-    # Set the task parameters.
-    qd['Full'].update({'DateObs':'*'})
-    qd['CenSp'].update({'DateObs':'*'})
-    gmos.gireduce.unlearn()
-    gmos.gsflat.unlearn()
-    # Normalize the spectral flats per CCD.
-    # The response fitting should be done interactively.
-    flatFlags = {
-        'fl_over':'yes','fl_trim':'yes','fl_bias':'yes','fl_dark':'no',
-        'fl_fixpix':'no','fl_oversize':'no','fl_vardq':'yes','fl_fulldq':'yes',
-        'rawpath':'./raw','fl_inter':'no','fl_detec':'yes',
-        'function':'spline3','order':'13,11,28',
-        'logfile':'gsflatLog.txt','verbose':'no'
-        }
-    for r in regions:
-        qr = qd[r]
-        flatFiles = fs.fileListQuery(dbFile, fs.createQuery('gcalFlat', qr), qr)
-        if len(flatFiles) > 0:
-            gmos.gsflat (','.join(str(x) for x in flatFiles), 'MCflat'+r,
-                    bias='MCbias'+r, **flatFlags)
-
-    iraf.imdel('gS2007*.fits,gsS2007*.fits')
-
-    print ("=== Processing Science Files ===")
-    print (" -- Performing Basic Processing --")
-
-    # Set task parameters.
-    gmos.gsreduce.unlearn()
-    sciFlags = {
-        'fl_over':'yes','fl_trim':'yes','fl_bias':'yes','fl_gscrrej':'no',
-        'fl_dark':'no','fl_flat':'yes','fl_gmosaic':'yes','fl_fixpix':'no',
-        'fl_gsappwave':'yes','fl_oversize':'no',
-        'fl_vardq':'yes','fl_fulldq':'yes','rawpath':'./raw',
-        'fl_inter':'no','logfile':'gsreduceLog.txt','verbose':'no'
-    }
-    arcFlags = copy.deepcopy(sciFlags)
-    arcFlags.update({'fl_flat':'no','fl_vardq':'no','fl_fulldq':'no'})
-    stdFlags = copy.deepcopy(sciFlags)
-    stdFlags.update({'fl_fixpix':'yes','fl_vardq':'no','fl_fulldq':'no'})
-
-    # Perform basic reductions on all exposures for science targets.
-    print ("  - Arc exposures -")
-    for r in regions:
-        qr = qd[r]
-        arcFiles = fs.fileListQuery(dbFile, fs.createQuery('arc', qr), qr)
-        if len(arcFiles) > 0:
-            gmos.gsreduce (','.join(str(x) for x in arcFiles), 
-                           bias='MCbias'+r, **arcFlags)
-
-    print ("  - Std star exposures -")
-    r = 'CenSp'
-    stdFiles = fs.fileListQuery(dbFile, fs.createQuery('std', qd[r]), qd[r])
-    if len(stdFiles) > 0:
-        gmos.gsreduce (','.join(str(x) for x in stdFiles), bias='MCbias'+r,
-                  flatim='MCflat'+r, **stdFlags)
-
-    print ("  - Science exposures -")
-    r = 'Full'
-    sciFiles = fs.fileListQuery(dbFile, fs.createQuery('sciSpec', qd[r]), qd[r])
-    if len(sciFiles) > 0:
-        gmos.gsreduce (','.join(str(x) for x in sciFiles), bias='MCbias'+r,
-                  flatim='MCflat'+r, **sciFlags)
-
-    # Clean up
-    iraf.imdel('gS2007*.fits')
-    
-    print (" -- Determine wavelength calibration --")
-    # Set task parameters
-    gmos.gswavelength.unlearn()
-    waveFlags = {
-        'coordlist':'gmos$data/CuAr_GMOS.dat','fwidth':6,'nsum':50,
-        'function':'chebyshev','order':5,
-        'fl_inter':'no','logfile':'gswaveLog.txt','verbose':'no'
-        }
-    # The fit to the dispersion relation should be performed interactively.
-    # Here we will use a previously determined result.
-    # Need to select specific wavecals to match science exposures.
-    prefix = 'gsS20070623S0'
-    for arc in ['071', '081', '091', '109']:
-        gmos.gswavelength (prefix+arc, **waveFlags)
-
-    ### End of basic processing. Continue with advanced processing.
-
-    print(" -- Performing Advanced Processing --")
-    print(" -- Combine exposures, apply dispersion, subtract sky --")
-    # Set task parameters.
-    gemtools.gemcombine.unlearn()
-    sciCombFlags = {
-        'combine':'average','reject':'ccdclip',
-        'fl_vardq':'yes','fl_dqprop':'yes',
-        'logfile':'gemcombineLog.txt.txt','verbose':'no'
-    }
-    stdCombFlags = copy.deepcopy(sciCombFlags)
-    stdCombFlags.update({'fl_vardq':'no','fl_dqprop':'no'})
-    gmos.gstransform.unlearn()
-    transFlags = {
-        'fl_vardq':'yes','interptype':'linear','fl_flux':'yes',
-        'logfile':'gstransLog.txt'
-    }
-    # The sky regions should be selected with care, using e.g. prows/pcols:
-    #   pcols ("tAM2306b.fits[SCI]", 1100, 2040, wy1=40, wy2=320)
-    gmos.gsskysub.unlearn()
-    skyFlags = {
-        'fl_oversize':'no','fl_vardq':'yes','logfile':'gsskysubLog.txt'
-    }
-
-    # Process the Standard Star
-    prefix = "gs"
-    qs = qd['CenSp']
-    stdFiles = fs.fileListQuery(dbFile, fs.createQuery('std', qs), qs)
-    gemtools.gemcombine (','.join(prefix+str(x) for x in stdFiles), 
-                         'LTT9239', **stdCombFlags)
-    gmos.gstransform ('LTT9239', wavtraname='gsS20070623S0109', **transFlags)
-    gmos.gsskysub ('tLTT9239', long_sample='20:70,190:230')
-
-    print(" -- Extract Std spectrum --")
-    # Extract the std spectruma using a large aperture.
-    # It's important to trace the spectra interactively.
-    gmos.gsextract.unlearn()
-    extrFlags = {
-        'apwidth':3.,'fl_inter':'no','find':'yes',
-        'trace':'yes','tfunction':'chebyshev','torder':'6','tnsum':20,
-        'background':'fit','bfunction':'chebyshev','border':2,
-        'fl_vardq':'no','logfile':'gsextrLog.txt'
-    }
-    gmos.gsextract ("stLTT9239", **extrFlags)
-
-    print(" -- Derive the Flux calibration --")
-    gmos.gsstandard.unlearn()
-    sensFlags = {
-        'fl_inter':'yes','starname':'l9239','caldir':'onedstds$ctionewcal/',
-        'observatory':'Gemini-South','extinction':'onedstds$ctioextinct.dat',
-        'function':'chebyshev','order':9,'verbose':'no','logfile':'gsstdLog.txt'
-    }
-    gmos.gsstandard ('estLTT9239', sfile='std.txt', sfunction='sens', **sensFlags)
-
-    # Process the science targets.
-    # Use a dictionary to associate science targets with Arcs and sky regions.
-    sciTargets = {
-        'AM2306-721_a':{'arc':'gsS20070623S0071','sky':'520:720'}, 
-        'AM2306-72_b':{'arc':'gsS20070623S0081','sky':'670:760,920:1020'}, 
-        'AM2306-721_c':{'arc':'gsS20070623S0091','sky':'170:380,920:1080'}
-    }
-    for targ,p in sciTargets.iteritems():
-        qs = qd['Full']
-        qs['Object'] = targ
-        # Fix up the target name for the output file
-        sciOut = targ.split('-')[0]+targ[-1]
-        sciFiles = fs.fileListQuery(dbFile, fs.createQuery('sciSpec', qs), qs)
-        gemtools.gemcombine(','.join(prefix+str(x) for x in sciFiles), 
-                             sciOut, **sciCombFlags)
-        gmos.gstransform(sciOut, wavtraname=p['arc'], **transFlags)
-        gmos.gsskysub('t'+sciOut, long_sample=p['sky'], **skyFlags)
-
-    # Clean up
-    iraf.imdel("gsS2007*.fits")
-
-    ## Apply the sensitivity function.
-    gmos.gscalibrate.unlearn()
-    calibFlags = {
-        'extinction':'onedstds$ctioextinct.dat','fl_ext':'yes','fl_scale':'no', 
-        'sfunction':'sens','fl_vardq':'yes','logfile':'gscalibrateLog.txt'
-        }
-    gmos.gscalibrate('stAM2306*', **calibFlags)
-    calibFlags.update({'fl_vardq':'no'})
-    gmos.gscalibrate('estLTT9239', **calibFlags)
-
-    print (" -- Extract Target Spectra --")
-    onedspec.nsum=4
-    onedspec.sarith('cstAM2306b.fits[SCI]', 'copy', '', 'ecstAM2306b.ms',
-                          apertures='222-346x4')
-
-    print ("=== Finished Calibration Processing ===")
-    '''
-if __name__ == "__main__":
-    gmos_asteroids_proc()
