@@ -69,7 +69,7 @@ except ImportError:
 
 
 from SP_CheckInstrument import CheckInstrument
-import SP_Deveny_Toolbox as SP_Dev_Tool
+
 import SP_Toolbox as tb
 
 
