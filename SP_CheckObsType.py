@@ -63,7 +63,6 @@ def CheckObsType(filenames):
         try:
             if telescope == 'GMOSS' or telescope == 'GMOSN':
                 hdulist = GMOS_open2([filename])
-                print('test')
             else:
                 hdulist = fits.open(filename, mode='update' ,ignore_missing_end=True)
         except IOError:
@@ -81,39 +80,17 @@ def CheckObsType(filenames):
 
 
         data = hdulist[0].data
-        print(data.shape)
         Med = np.nanmedian(data[10:-10,10:-10])
         Max = np.nanmax(data[10:-10,10:-10])
         std0 = np.nanstd(np.median(data[10:-10,10:-10],axis=0))
         std1 = np.nanstd(np.median(data[10:-10,10:-10],axis=1))
-        
-        print(Med)
-        print(Max)
-        print(std0)
-        print(std1)
-        
-        
-        
-        
-#        if telescope == 'SOAR':
-#            index = filename.split('_')[0]
-#            if Med > Max/5 and std0 > 1000:
-#                hdulist[0].header[obsparam['obstype']] = 'FLAT'
-#                TIME = hdulist[0].header[obsparam['date_keyword']].replace('-','').replace(':','').replace('.','')
-#                EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
-#                Name= telescope + '_' + index + '_' + TIME + '_FLAT_' + EXPTIME + '.fits'
-#                hdulist.close()
-#                shutil.copy(filename,Name)
-#                _SP_conf.filenames.append(Name)
-#                print('%s changed to %s' % (filename, Name))        
-        
-
+                
 
         if telescope == 'SOAR':
             index = filename.split('_')[0]
             
             if hdulist[0].header[obsparam['grating']] == '<NO GRATING>': # Acquisition files
-                print('Acquisition files')
+#                print('Acquisition files')
                 TIME = hdulist[0].header[obsparam['date_keyword']].replace('-','').replace(':','').replace('.','')
                 EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
                 Name= telescope + '_' + index + '_' + TIME + '_ACQ_' + EXPTIME + '.fits'
@@ -135,7 +112,6 @@ def CheckObsType(filenames):
                 
                 else: # Biases
                     if std0 + std1 < 10 and int(hdulist[0].header[obsparam['exptime']]) == 0: 
-                        #print('%s changed to %s' % (hdulist[0].header[obsparam['obstype']], 'BIAS'))
                         hdulist[0].header[obsparam['obstype']] = 'BIAS'
                         TIME = hdulist[0].header[obsparam['date_keyword']].replace('-','').replace(':','').replace('.','')
                         EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
@@ -151,10 +127,7 @@ def CheckObsType(filenames):
                         EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
                         OBJECT = hdulist[0].header[obsparam['object']].replace(' ','').replace('/','')
                         TYPE = 'Unknown'
-                        print(obsparam['object'])
                         if OBJECT.replace(' ',''):
-                            print('bla')
-                            print(OBJECT)
                             try:
                                 Horizons(id=OBJECT).ephemerides()
                                 TYPE = 'Asteroid'
@@ -163,7 +136,6 @@ def CheckObsType(filenames):
                                     #result_table = Simbad.query_object(OBJECT)
                                     result_table = Simbad.query_region(coord.SkyCoord(hdulist[0].header[obsparam['ra']] + ' ' + hdulist[0].header[obsparam['dec']] ,unit=(u.hourangle,u.deg), frame='icrs'), radius='0d1m00s')
                                     T = result_table['MAIN_ID'][0]
-                                    print(T)
                                     if result_table['MAIN_ID'][0] in List_ID_SA: 
                                         OBJECT = List_ID_SA_Comp[result_table['MAIN_ID'][0]]
                                         TYPE = 'SA'
@@ -241,7 +213,6 @@ def CheckObsType(filenames):
                         TYPE = 'Unknown'
                         print(obsparam['object'])
                         if OBJECT.replace(' ',''):
-                            print('bla')
                             print(OBJECT)
                             try:
                                 Horizons(id=OBJECT).ephemerides()
@@ -251,7 +222,6 @@ def CheckObsType(filenames):
                                     #result_table = Simbad.query_object(OBJECT)
                                     result_table = Simbad.query_region(coord.SkyCoord(hdulist[0].header[obsparam['ra']] + ' ' + hdulist[0].header[obsparam['dec']] ,unit=(u.hourangle,u.deg), frame='icrs'), radius='0d1m00s')
                                     T = result_table['MAIN_ID'][0]
-                                    print(T)
                                     if result_table['MAIN_ID'][0] in List_ID_SA: 
                                         OBJECT = List_ID_SA_Comp[result_table['MAIN_ID'][0]]
                                         TYPE = 'SA'
@@ -309,7 +279,6 @@ def CheckObsType(filenames):
             Name= telescope + '_' + index + '_' + TIME + '_' + TYPE + '_' + OBJECT + '_' + CENTWAVE +'_' + EXPTIME + '.fits'
             hdulist.writeto(Name)    
             
-        print(index)
         
 
     if telescope == 'DEVENY':             
@@ -323,7 +292,6 @@ def CheckObsType(filenames):
                 Series.append('ARCS')
             else:
                 Series.append('FOCUS')  
-            #print(Focus)
             Focus = []                 
                 
         for idx, elem in enumerate(Cons):
@@ -336,7 +304,6 @@ def CheckObsType(filenames):
                     filenames.pop(idx)
                     continue
                 if Series[idx] == 'ARCS':
-                    #print('%s changed to %s' % (hdulist[0].header[obsparam['obstype']], 'ARCS'))
                     hdulist[0].header[obsparam['obstype']] = 'ARCS'
                     TIME = hdulist[0].header[obsparam['date_keyword']].replace('-','').replace(':','').replace('.','')
                     EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
@@ -346,7 +313,6 @@ def CheckObsType(filenames):
                     _SP_conf.filenames.append(Name)
                     print('%s changed to %s' % (filenames[CollFoc[Cons[idx][idx2][0]][2]], Name))
                 else:
-                    #print('%s changed to %s' % (hdulist[0].header[obsparam['obstype']], 'FOCUS'))
                     hdulist[0].header[obsparam['obstype']] = 'FOCUS'
                     TIME = hdulist[0].header[obsparam['date_keyword']].replace('-','').replace(':','').replace('.','')
                     EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
