@@ -11,7 +11,6 @@ Spectroscopy pipeline:
 """
 
 #! /usr/bin/env python
-#    2016-Jun-08  shaw@noao.edux
 
 #import sys
 
@@ -714,7 +713,7 @@ def Create_Flat(image_list,**kw):
 
     # Do the program displays text during the processing ?
     # [False], True
-    if kw.has_key('Verbose'):
+    if 'Verbose' in kw:
         verbose = kw['Verbose']
     else:
         verbose = False
@@ -724,7 +723,7 @@ def Create_Flat(image_list,**kw):
     # WriteFile = False : Do not create any fits file
     # WriteFile = 'any string' : Create a fits file named the string given
     # [False]
-    if kw.has_key('WriteFile'):
+    if 'WriteFile' in kw:
         WriteFile = kw['WriteFile']
         if WriteFile is True:
             print('No flat name was provided, MasterFlat.fits is used as default')
@@ -737,16 +736,16 @@ def Create_Flat(image_list,**kw):
     
     # Indicate where the raw data are located 
     # Take the current directory as default 
-    if kw.has_key('RawPath'):
+    if 'RawPath' in kw:
         RawPath = kw['RawPath']
     else:
-        RawPath = './'   
+        RawPath = './'  
         
         
     # Check if a bias file is provided
     # Stop the program if not
-    if kw.has_key('Bias'):
-        if isinstance(kw['Bias'], basestring):
+    if 'Bias' in kw:
+        if isinstance(kw['Bias'], str):
             hdulist = fits.open(kw['Bias'])
             MasterBias = hdulist[0].data
         if isinstance(kw['Bias'], np.ndarray):
@@ -759,22 +758,22 @@ def Create_Flat(image_list,**kw):
 
     # Do you want to want to overwrite if the file already exist ? 
     # [False]
-    if kw.has_key('OverWrite'):
+    if 'OverWrite' in kw:
         OverWrite = kw['OverWrite']
     else:
         OverWrite = False   
 
 
-    if kw.has_key('AddFits'):
+    if 'AddFits' in kw:
         AddFits = kw['AddFits']
     else:
         AddFits = True 
         
         
-    if kw.has_key('IsGMOS'):
+    if 'IsGMOS' in kw:
         IsGMOS = kw['IsGMOS']
     else:
-        IsGMOS = True     
+        IsGMOS = True        
     ###### End of argument parsing #######
 
 
@@ -850,14 +849,14 @@ def Reduce(image_list,**kw):
 
     # Do the program displays text during the processing ?
     # [False], True
-    if kw.has_key('Verbose'):
+    if 'Verbose' in kw:
         verbose = kw['Verbose']
     else:
         verbose = False
         
     # Indicate where the raw data are located 
     # Take the current directory as default 
-    if kw.has_key('RawPath'):
+    if 'RawPath' in kw:
         RawPath = kw['RawPath']
     else:
         RawPath = './'   
@@ -865,8 +864,8 @@ def Reduce(image_list,**kw):
         
     # Check if a bias file is provided
     # Stop the program if not
-    if kw.has_key('Bias'):
-        if isinstance(kw['Bias'], basestring):
+    if 'Bias' in kw:
+        if isinstance(kw['Bias'], str):
             hdulist = fits.open(kw['Bias'])
             MasterBias = hdulist[0].data
         if isinstance(kw['Bias'], np.ndarray):
@@ -879,8 +878,8 @@ def Reduce(image_list,**kw):
 
     # Check if a flat file is provided
     # Stop the program if not
-    if kw.has_key('Flat'):
-        if isinstance(kw['Flat'], basestring):
+    if 'Flat' in kw:
+        if isinstance(kw['Flat'], str):
             hdulist = fits.open(kw['Flat'])
             MasterFlat = hdulist[0].data
         if isinstance(kw['Flat'], np.ndarray):
@@ -894,14 +893,14 @@ def Reduce(image_list,**kw):
 
     # Do you want to want to overwrite if the file already exist ? 
     # [False]
-    if kw.has_key('OverWrite'):
+    if 'OverWrite' in kw:
         OverWrite = kw['OverWrite']
     else:
         OverWrite = False   
 
 
     # Do the user provided a list of outputfiles ? 
-    if kw.has_key('OutFilelist'):
+    if 'OutFilelist' in kw:
         OutList = True
         OutFileList = kw['OutFilelist']
         Out_Suffix = ''
@@ -909,7 +908,7 @@ def Reduce(image_list,**kw):
         OutList = False
         Out_Suffix = '_proc'   
 
-    if kw.has_key('IsGMOS'):
+    if 'IsGMOS' in kw:
         IsGMOS = kw['IsGMOS']
     else:
         IsGMOS = True 
@@ -943,22 +942,22 @@ def Wav_Cal2(Arc ,**kw):
     
     ''' need to improve the function to work with any bin value and any R values ''' 
     
-    if kw.has_key('Instrument'):
+    if 'Instrument' in kw:
         Instrument = kw['Instrument']
     else:
         Instrument = 'GMOS'     
 
-    if kw.has_key('Binning'):
+    if 'Binning' in kw:
         Binning = kw['Binning']
     else:
         Binning = '2'
         
-    if kw.has_key('Gratting'):
+    if 'Gratting' in kw:
         Gratting = kw['Gratting']
     else:
         Gratting = 'R400+_G5325'  
         
-    if kw.has_key('Detector'):
+    if 'Detector' in kw:
         Detector = kw['Detector']
     else:
         Detector = 'Det'
@@ -1146,7 +1145,7 @@ def Wav_Cal2(Arc ,**kw):
 
 def Shift_Spec(Spectre,Wavel,**kw):
     
-    if kw.has_key('Instrument'):
+    if 'Instrument'  in kw:
         Instrument = kw['Instrument']
     else:
         Instrument = 'GMOS'    
@@ -1347,9 +1346,9 @@ def Detect_Spectra(data,Bin = 4,**kw):
     
     ###### Parse the argument sent through the function #######
 
-    # Do the program displays text during the processing ?
+    # Does the program displays text during the processing ?
     # [False], True
-    if kw.has_key('Verbose'):
+    if 'Verbose' in kw:
         verbose = kw['Verbose']
     else:
         verbose = False
@@ -1364,18 +1363,18 @@ def Detect_Spectra(data,Bin = 4,**kw):
     #   Offset : Check the offset of the different acquisition (only if dithering is used). Use an image
     #            which is the sum of all the images and search for the different spectra using the offset
     #           as calibration. 
-    if kw.has_key('Method'):
+    if 'Method' in kw:
         Method = kw['Method']
     else:
         Method = 'Maximum'   
 
-    if kw.has_key('Instrument'):
+    if 'Instrument' in kw:
         Instrument = kw['Instrument']
     else:
         Instrument = 'GMOS'     
     
     if Method == 'Offset':
-        if kw.has_key('Offset'):
+        if 'Offset' in kw:
             Offset = kw['Offset']
         
         Plate_Scale = 0.08*Bin;
@@ -1485,25 +1484,25 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
     
     
     
-    if kw.has_key('Instrument'):
+    if 'Instrument' in kw:
         Instrument = kw['Instrument']
     else:
         Instrument = 'GMOS'   
 
-    if kw.has_key('Binning'):
+    if 'Binning' in kw:
         Binning = kw['Binning']
     else:
         Binning = '2'
         
-    if kw.has_key('Gratting'):
+    if 'Gratting' in kw:
         Gratting = kw['Gratting']
     else:
         Gratting = 'R400+_G5325'   
         
-    if kw.has_key('Detector'):
+    if 'Detector' in kw:
         Detector = kw['Detector']
     else:
-        Detector = 'Det'       
+        Detector = 'Det'
         
         
     print(Instrument)    
@@ -1794,20 +1793,20 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
 def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
     
     
-    if kw.has_key('Instrument'):
+    if 'Instrument' in kw:
         Instrument = kw['Instrument']
     else:
         Instrument = 'GMOS' 
         
-    if kw.has_key('Binning'):
+    if 'Binning' in kw:
         Binning = kw['Binning']
     else:
         Binning = '2'
         
-    if kw.has_key('Gratting'):
+    if 'Gratting' in kw:
         Gratting = kw['Gratting']
     else:
-        Gratting = 'R400+_G5325'       
+        Gratting = 'R400+_G5325'     
     
     x_size = np.shape(data)[1]   
     
