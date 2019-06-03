@@ -11,7 +11,7 @@ Spectroscopy pipeline:
 """
 
 #! /usr/bin/env python
-#    2016-Jun-08  shaw@noao.edu
+#    2016-Jun-08  shaw@noao.edux
 
 #import sys
 
@@ -96,7 +96,6 @@ def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Tresh_Arcs = [8, 20]):
     plt.plot(Arcs)
     while np.median(Arcs) < max_value-5*np.std(Arcs):
         max_index, max_value = max(enumerate(Arcs), key=operator.itemgetter(1))
-        
         # Search for the size of the arc lines 
         
         value = 999999
@@ -116,8 +115,10 @@ def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Tresh_Arcs = [8, 20]):
             print(Arcs_Size)
             Arcs_loc.append(int(max_ind+min_ind)/2)
         
-        Arcs[min_ind-4:max_ind+4] = np.median(Arcs)
-
+        if min_ind>4:
+            Arcs[min_ind-4:max_ind+4] = np.nanmedian(Arcs)
+        else:
+            Arcs[:max_ind+4] = np.nanmedian(Arcs)
     
     for elem in Arcs_loc:
         plt.plot([elem,elem],[0,60000])
@@ -315,12 +316,16 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
 
     fig = plt.gcf()
     
-    plt.title(Facility + ', ' + SpecName )
+#    plt.title(Facility + ', ' + SpecName )
+    plt.title("Lowell's 4.3m DCT; DeVeny; 2019-05-28")
     plt.xlabel(r'Wavelength [micron]', fontsize=14)
     plt.ylabel(r'Normalized reflectance', fontsize=14)
+    plt.text(0.35,1.52, "Observers: B. Skiff, N. Moskovitz")
+    plt.text(0.35,1.47, "Reduction: M. Devogele")
+
 
     im = plt.imread(get_sample_data('/Users/maximedevogele/Documents/PythonPackages/SP/manos_splash.eps'))
-    newax = fig.add_axes([0.75, 0.75, 0.25, 0.25], anchor='NE', zorder=1)
+    newax = fig.add_axes([0.82, 0.82, 0.12, 0.12], anchor='NE', zorder=1)
     newax.imshow(im)
     newax.axis('off')
 
@@ -1692,7 +1697,7 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
                 if i > 1050 or i < 1020 and i > 300 :
                     New_xs = range(int(p0[4])-Range,int(p0[4])+Range)
                     New_SS = np.median(data[New_xs,i-15:i+15],axis=1)
-                    SS = Lin_Interp(New_SS,10)
+                    xs, SS = Lin_Interp(New_xs,New_SS,10)
 
                     print(i)
                     coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
@@ -1844,7 +1849,7 @@ def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
                 Spec.append(sum(Sec))
         if Binning == '4':
             if Instrument == 'GMOSS':
-                for i in range(1562):
+                for i in range(1499):
                     if Trace.astype(int)[i] < 10:
                         Trace[i] = 100
                     Sec = data[Trace.astype(int)[i]-(FWHM*2):Trace.astype(int)[i]+(FWHM*2)+1,i]- bkg[i]
@@ -1854,13 +1859,13 @@ def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
                     Cond = cond1*cond2
                     Spec.append(sum(SS*Cond))    
             if Instrument == 'GMOSN':
-                for i in range(1562):
+                for i in range(1499):
                     Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]- bkg[i]
                     Spec.append(sum(Sec))          
         
-        plt.figure()
-        Spec = np.array(Spec)
-        plt.plot(Spec[Mask])    
+#        plt.figure()
+#        Spec = np.array(Spec)
+#        plt.plot(Spec[Mask])    
         
         return Spec
     
@@ -1918,12 +1923,13 @@ def Sigma_Clip(data, sig = 3):
             Cond_Tamp1 = Cond1
             Cond_Tamp2 = Cond2
             
+            
             data = ma.masked_outside(data, Cond1, Cond2)
             
             Cond1 = ma.median(data) - np.std(data)*sig
             Cond2 = ma.median(data) + np.std(data)*sig
 
-            if Counter < 100:
+            if Counter > 100:
                 return data            
         return data
         
@@ -1952,7 +1958,7 @@ def Sigma_Clip(data, sig = 3):
             
             Cond1 = np.median(data[SIG_CLIP]) - np.std(data[SIG_CLIP])*sig
             Cond2 = np.median(data[SIG_CLIP]) + np.std(data[SIG_CLIP])*sig
-            if Counter < 100:
+            if Counter > 100:
                 return SIG_CLIP
     
         return SIG_CLIP    

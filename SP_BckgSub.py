@@ -84,8 +84,8 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
                 Center = Spec_Loc[idx]
                 print(Center)
                 
-            Area[0] = int(Center-90)
-            Area[1] = int(Center+90) 
+            Area[0] = int(Center-200)
+            Area[1] = int(Center+200) 
 
             print(Area)
             
@@ -102,7 +102,7 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
             for i in range(image.shape[1]):
                 index = np.argwhere(np.isnan(image2[:,i]))
                 image2[index,i]=0
-                image3 = SP.Sigma_Clip(image2[:,i])
+                image3 = SP.Sigma_Clip(image2[:,i],sig = 3)
                 XX = np.ma.masked_array(X,image3.mask)
                 z = np.ma.polyfit(XX,image3 , 1)
                 p = np.poly1d(z)

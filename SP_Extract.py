@@ -59,7 +59,7 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic):
                 SSpec.append(Spec1)
                 
 #            max_index, max_value = max(enumerate(np.nanmedian(SSpec,axis=1)/np.nanstd(SSpec,axis=1)), key=operator.itemgetter(1))
-            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=6,Mask = MASK1,**DetecFlags)
+            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=13,Mask = MASK1,**DetecFlags)
             
 #            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=50,Mask = MASK1,**DetecFlags)
             Spec1N = Spec1/np.abs(np.nanmedian(Spec1[1500:1600]))
@@ -100,7 +100,7 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic):
             print(Start)
             data = hdulist[0].data
             data[data==0] = np.nan
-            Trace, bkg, MASK1 = SP.Fit_Trace(data,Start,Range = 10, SClip = True,**DetecFlags)
+            Trace, bkg, MASK1 = SP.Fit_Trace(data,Start,Range = 15, SClip = True,**DetecFlags)
             
             
             # write a fits file with the extracted trace
@@ -116,14 +116,14 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic):
             Out_Files.append(elem.replace('.fits','') + 'Trace.fits')
 
             
-            SSpec = []
-            for FW in range(20):
-                Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=FW,Mask = MASK1,**DetecFlags)
-                SSpec.append(Spec1)
+#            SSpec = []
+#            for FW in range(20):
+#                Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=FW,Mask = MASK1,**DetecFlags)
+#                SSpec.append(Spec1)
                 
-            max_index, max_value = max(enumerate(np.nanmedian(SSpec,axis=1)/np.nanstd(SSpec,axis=1)), key=operator.itemgetter(1))
+#            max_index, max_value = max(enumerate(np.nanmedian(SSpec,axis=1)/np.nanstd(SSpec,axis=1)), key=operator.itemgetter(1))
 #            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=max_index+1,Mask = MASK1,**DetecFlags)
-            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=4,Mask = MASK1,**DetecFlags)
+            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=10,Mask = MASK1,**DetecFlags)
     
             
             

@@ -70,7 +70,7 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
         Dim.append(np.size(Arcs,1))
     
         Arcs_L = Arcs[Dim[0]/2,:] 
-        Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.5, Tresh_Arcs = [3, 10] )
+        Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.5, Tresh_Arcs = [4, 10] )
         
         f = open('/Users/maximedevogele/Documents/PythonPackages/SP/Wav_Precomp','r')
         Pre = pickle.load(f)
