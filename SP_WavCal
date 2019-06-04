@@ -11,13 +11,15 @@ from astropy.io import fits
 import pickle
 import operator
 from itertools import combinations
+import os
+import _SP_conf
 
 from SP_CheckInstrument import CheckInstrument
 
 
 def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
     
-    
+    Pipe_Path = _SP_conf.rootpath
     Arcs = []
     for elem in ArcsFile:
         hdulist = fits.open(elem)
@@ -72,7 +74,7 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
         Arcs_L = Arcs[Dim[0]/2,:] 
         Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.5, Tresh_Arcs = [4, 10] )
         
-        f = open('/Users/maximedevogele/Documents/PythonPackages/SP/Wav_Precomp','r')
+        f = open(Pipe_Path + '/Wav_Precomp','r')
         Pre = pickle.load(f)
         f.close()
         
