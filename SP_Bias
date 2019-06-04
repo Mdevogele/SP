@@ -7,7 +7,6 @@
 import argparse, shlex
 
 import SP_Toolbox as SP
-import SP_Deveny_Toolbox as SP_Dev_Tool
 import numpy as np
 
 from astropy.io import fits
