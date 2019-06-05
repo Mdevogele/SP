@@ -57,10 +57,10 @@ from astropy.visualization import (astropy_mpl_style, ZScaleInterval,
 
 try:
     import matplotlib
-    matplotlib.use('Agg')
+#    matplotlib.use('Agg')
     import matplotlib.pylab as plt
-    matplotlib.rcdefaults() # restore default parameters
-    plt.style.use(astropy_mpl_style) # use astropy style
+#    matplotlib.rcdefaults() # restore default parameters
+#    plt.style.use(astropy_mpl_style) # use astropy style
 except ImportError:
     print('Module matplotlib not found. Please install with: pip install '
           'matplotlib')
