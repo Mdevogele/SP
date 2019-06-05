@@ -14,6 +14,8 @@ import datetime
 from astropy.io import ascii
 from astropy.io import fits
 
+import shutil
+
 import SP_Toolbox as toolbox
 from SP_CheckObsType import CheckObsType
 import _SP_conf
