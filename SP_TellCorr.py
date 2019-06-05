@@ -20,37 +20,36 @@ def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
     
         if Target == False:
             Target = elem.split('.')[0]
-        
-        with open(elem,'r') as f:
-            SpecA = repr(f.read().splitlines())
-            
-        Spec = SpecA.replace('"','').replace('[','').replace(']','').replace("'",'').replace("\\",'').replace('t','').replace(',','').split()    
-    
-        Spec = np.array(Spec).astype(float)
-        print(len(Spec))
-        Spec = Spec.reshape(len(Spec)/2,2)
-#        Spec = Spec.reshape(2148,2)
+   
 
+
+        Spec = np.loadtxt(elem).transpose()     
         
-        Wav = Spec[:,0]
-        SpecA = Spec[:,1]
+        if np.size(Spec,0) != 2:
+            print('ERROR: Wrong asteroid spectrum file')
+            print('ERROR: It is not a two columns text file')
+            print('ERROR: SP_TellCorr takes as argument the output of SP_WavCal')
+            return
+        
+        Wav = Spec[0]
+        SpecA = Spec[1]
+        
         
         idx = (Wav>0.505)*(Wav<0.605)
         index = np.where(idx)
         SpecA = SpecA/np.nanmedian(SpecA[index])
     
-        with open(Std,'r') as f:
-            SpecSA = repr(f.read().splitlines())
-    
-        Spec = SpecSA.replace('"','').replace('[','').replace(']','').replace("'",'').replace("\\",'').replace('t','').replace(',','').split()    
-    
-        Spec = np.array(Spec).astype(float)
-        print(len(Spec))
-        Spec = Spec.reshape(len(Spec)/2,2)
-#        Spec = Spec.reshape(2148,2)
         
-        WavSA = Spec[:,0]
-        SpecSA = Spec[:,1]
+        Spec = np.loadtxt(Std).transpose()     
+
+        if np.size(Spec,0) != 2:
+            print('ERROR: Wrong solar analog spectrum file')
+            print('ERROR: It is not a two columns text file')
+            print('ERROR: SP_TellCorr takes as argument the output of SP_WavCal')
+            return
+
+        WavSA = Spec[0]
+        SpecSA = Spec[1]
     
         SpecSA = SpecSA/np.nanmedian(SpecSA[index])
     
