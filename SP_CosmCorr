@@ -20,30 +20,7 @@ from astropy.io import fits
 
 from astroscrappy import detect_cosmics
 
-
-
-def Cosmic(filename,Diagnostic):
-    
-    Out_Name = []
-    telescope, obsparam = CheckInstrument([filename[0]])
-    for idx, elem in enumerate(filename): 
-        hdulist = fits.open(elem)
-        data=hdulist[0].data
-#        c = cosmic.cosmicsimage(data,satlevel=65000)
-        
-        crmask, c = detect_cosmics(data, inmask=None, satlevel=65000)
-        
-        
-#        c.run(maxiter = 1)
-#        hdulist[0].data = c.cleanarray
-        hdulist[0].data = c
-
-        Out_Name.append(elem.replace('.fits','').replace('_Procc','') + '_' + '_CosmCorr' + '.fits')
-        hdulist.writeto(elem.replace('.fits','').replace('_Procc','') + '_' + '_CosmCorr' + '.fits')
-        
-    if Diagnostic: 
-        diag.create_website('Cosmic-Correction_Log.html')
-        diag.add_CosmCorr(Out_Name,'Cosmic-Correction_Log.html')
+from SP_CosmCorr import Cosmic
 
 if __name__ == '__main__':
     
