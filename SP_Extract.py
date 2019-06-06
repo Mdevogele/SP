@@ -21,7 +21,7 @@ import SP_diagnostics as diag
 from SP_CheckInstrument import CheckInstrument
 
 
-def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic): 
+def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM): 
     
     
     Out_Files = []
@@ -59,7 +59,7 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic):
                 SSpec.append(Spec1)
                 
 #            max_index, max_value = max(enumerate(np.nanmedian(SSpec,axis=1)/np.nanstd(SSpec,axis=1)), key=operator.itemgetter(1))
-            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=13,Mask = MASK1,**DetecFlags)
+            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=Spec_FWHM,Mask = MASK1,**DetecFlags)
             
 #            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=50,Mask = MASK1,**DetecFlags)
             Spec1N = Spec1/np.abs(np.nanmedian(Spec1[1500:1600]))
@@ -123,7 +123,7 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic):
                 
 #            max_index, max_value = max(enumerate(np.nanmedian(SSpec,axis=1)/np.nanstd(SSpec,axis=1)), key=operator.itemgetter(1))
 #            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=max_index+1,Mask = MASK1,**DetecFlags)
-            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=10,Mask = MASK1,**DetecFlags)
+            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=Spec_FWHM,Mask = MASK1,**DetecFlags)
     
             
             
@@ -161,6 +161,10 @@ if __name__ == '__main__':
                         nargs='+')
     parser.add_argument('-g',
                         help='Generic name of the offset and spectra location')
+    
+    parser.add_argument('-fwhm',
+                        default = 5
+                        help='FWHM of the spectrum trace')
 
     parser.add_argument('-d',
                         help='Enable or disable the diagnostic',
@@ -172,11 +176,12 @@ if __name__ == '__main__':
     Verbose = args.v
     Spec_loc = args.g
     filenames = args.images  
+    fwhm = args.fwhm
     Diagnostic = args.d
     
     print(filenames)
 
     
-    Extract_Spectrum(filenames,Verbose,Spec_loc,Diagnostic)
+    Extract_Spectrum(filenames,Verbose,Spec_loc,Diagnostic,fwhm)
     pass
 
