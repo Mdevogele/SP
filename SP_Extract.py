@@ -163,7 +163,7 @@ if __name__ == '__main__':
                         help='Generic name of the offset and spectra location')
     
     parser.add_argument('-fwhm',
-                        default = 5
+                        default = 5,
                         help='FWHM of the spectrum trace')
 
     parser.add_argument('-d',
@@ -176,7 +176,7 @@ if __name__ == '__main__':
     Verbose = args.v
     Spec_loc = args.g
     filenames = args.images  
-    fwhm = args.fwhm
+    fwhm = int(args.fwhm)
     Diagnostic = args.d
     
     print(filenames)
