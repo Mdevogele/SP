@@ -50,6 +50,7 @@ module_logger_Flat = logging.getLogger(__name__ + '.D')
 module_logger_Preproc = logging.getLogger(__name__ + '.E')
 module_logger_CosmCorr = logging.getLogger(__name__ + '.F')
 module_logger_Bckgsub = logging.getLogger(__name__ + '.G')
+module_logger_Extract = logging.getLogger(__name__ + '.H')
 
 
 
@@ -285,7 +286,7 @@ class simpleapp_tk(Tk):
  
         self.BckgSub_run_button = Button(self.tab_BckgSub, text="Correct cosmics", width=20)
         self.BckgSub_run_button.grid(row=1, column=0, sticky=W)  
-        self.BckgSub_run_button.bind("<ButtonRelease-1>", self.Cosmcorr)   
+        self.BckgSub_run_button.bind("<ButtonRelease-1>", self.BckgSub)   
        
         self.frame_BckgSub=Frame(self.tab_BckgSub, width=1000, height=400)
         self.frame_BckgSub.grid(column=2, row=0,rowspan=25,columnspan=10)
@@ -298,6 +299,77 @@ class simpleapp_tk(Tk):
         self.frame_BckgSub.mytext_BckgSub = Text(self.frame_BckgSub, state="disabled")
         self.frame_BckgSub.mytext_BckgSub.place(x=10, y=10, height=990, width=390)  
               
+
+
+    def Extract_GUI(self):
+        
+        self.Extract_load_button = Button(self.tab_Extract, text="Load files", width=20)
+        self.Extract_load_button.grid(row=0, column=0, sticky=W)  
+        self.Extract_load_button.bind("<ButtonRelease-1>", self.load_file_Extract)    
+ 
+        self.Extract_run_button = Button(self.tab_Extract, text="Extract spectra", width=20)
+        self.Extract_run_button.grid(row=1, column=0, sticky=W)  
+        self.Extract_run_button.bind("<ButtonRelease-1>", self.Extract)   
+       
+        self.frame_Extract=Frame(self.tab_Extract, width=1000, height=400)
+        self.frame_Extract.grid(column=2, row=0,rowspan=25,columnspan=10)
+
+        self.frame_Extract.grid_propagate(False)
+
+        self.frame_Extract.grid_rowconfigure(0, weight=1)
+        self.frame_Extract.grid_columnconfigure(0, weight=1)
+
+        self.frame_Extract.mytext_Extract = Text(self.frame_Extract, state="disabled")
+        self.frame_Extract.mytext_Extract.place(x=10, y=10, height=990, width=390)  
+
+
+
+############################################################################## 
+# SP_Extract
+##############################################################################
+
+
+    def load_file_extract(self, event):
+        self.fname = askopenfilenames()
+        self.now = datetime.datetime.now()
+        self.files_Extract=[]
+        for elem in self.fname:
+            module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
+            self.files_Extract.append(elem)
+        
+        self.read_all_fits(self.files_Extract)
+        print(self.images[0])
+        
+        self.canvas.delete("all")
+#        self.tkimage.forget()
+        self.canvas.forget()
+        
+        
+        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+                             self.tkimage.width())
+        self.canvas.pack()
+        self.image = self.canvas.create_image(0, 0, anchor='nw',
+                                              image=self.tkimage)  
+        
+              # select first image
+        
+        im = self.images[0]
+        self.tkimage.paste(im)
+            
+        return None
+
+    def Extract(self, event):
+        now = datetime.datetime.now()
+        module_logger.info(now)
+        os.system('python ' + Pipe_Path + '/SP_Extract.py ' + " ".join(self.files_Extract))
+        self.now = datetime.datetime.now()
+        module_logger_Extract.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
+        
+        return None
+
+
+
         
 
 ############################################################################## 
