@@ -96,7 +96,7 @@ class simpleapp_tk(Tk):
 
         ### load dummy image for canvas 
         
-        Manos_img= misc.imread('/Users/maximedevogele/Documents/PythonPackages/SP/manos_splash.png')
+        Manos_img= misc.imread(Pipe_Path + 'manos_splash.png')
         self.tkimage = ImageTk.PhotoImage(Image.fromarray(Manos_img), palette=256)
         self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
                              self.tkimage.width())
