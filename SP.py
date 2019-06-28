@@ -89,14 +89,16 @@ class simpleapp_tk(Tk):
 
         self.tab_BckgSub = Frame(self.TabControl)
         self.TabControl.add(self.tab_BckgSub,text='Background subtraction')
-        
+
+        self.tab_Extract = Frame(self.TabControl)
+        self.TabControl.add(self.tab_Extract,text='Spectre extraction')        
         
         self.TabControl.pack(expand=1, fill="both") 
         
 
         ### load dummy image for canvas 
         
-        Manos_img= misc.imread(Pipe_Path + 'manos_splash.png')
+        Manos_img= misc.imread(Pipe_Path + '/manos_splash.png')
         self.tkimage = ImageTk.PhotoImage(Image.fromarray(Manos_img), palette=256)
         self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
                              self.tkimage.width())
