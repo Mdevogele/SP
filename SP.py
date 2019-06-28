@@ -144,6 +144,7 @@ class simpleapp_tk(Tk):
         self.Preproc_GUI()
         self.CosmCorr_GUI()
         self.BckgSub_GUI()
+        self.Extract_GUI()
 
     def Prepare_GUI(self):
         
@@ -329,7 +330,7 @@ class simpleapp_tk(Tk):
 ##############################################################################
 
 
-    def load_file_extract(self, event):
+    def load_file_Extract(self, event):
         self.fname = askopenfilenames()
         self.now = datetime.datetime.now()
         self.files_Extract=[]
