@@ -51,7 +51,8 @@ module_logger_Preproc = logging.getLogger(__name__ + '.E')
 module_logger_CosmCorr = logging.getLogger(__name__ + '.F')
 module_logger_Bckgsub = logging.getLogger(__name__ + '.G')
 module_logger_Extract = logging.getLogger(__name__ + '.H')
-module_logger_WavCal = logging.getLogger(__name__ + '.I')
+module_logger_Combine = logging.getLogger(__name__ + '.I')
+module_logger_WavCal = logging.getLogger(__name__ + '.J')
 
 
 
@@ -94,6 +95,9 @@ class simpleapp_tk(Tk):
 
         self.tab_Extract = Frame(self.TabControl)
         self.TabControl.add(self.tab_Extract,text='Spectra extraction')        
+
+        self.tab_Combine = Frame(self.TabControl)
+        self.TabControl.add(self.tab_Combine,text='Combine spectra')  
 
         self.tab_WavCal = Frame(self.TabControl)
         self.TabControl.add(self.tab_WavCal,text='Wavelength calibration')   
@@ -149,6 +153,7 @@ class simpleapp_tk(Tk):
         self.CosmCorr_GUI()
         self.BckgSub_GUI()
         self.Extract_GUI()
+        self.Combine_GUI()
         self.WavCal_GUI()
 
     def Prepare_GUI(self):
@@ -328,6 +333,33 @@ class simpleapp_tk(Tk):
         self.frame_Extract.mytext_Extract = Text(self.frame_Extract, state="disabled")
         self.frame_Extract.mytext_Extract.place(x=10, y=10, height=990, width=390)  
 
+    def Combine_GUI(self):
+        
+        self.Combine_load_button = Button(self.tab_Combine, text="Load files", width=20)
+        self.Combine_load_button.grid(row=0, column=0, sticky=W)  
+        self.Combine_load_button.bind("<ButtonRelease-1>", self.load_file_Combine)    
+ 
+        self.Combine_run_button = Button(self.tab_Combine, text="Combine spectra", width=20)
+        self.Combine_run_button.grid(row=1, column=0, sticky=W)  
+        self.Combine_run_button.bind("<ButtonRelease-1>", self.Combine)   
+       
+        self.frame_Combine=Frame(self.tab_Combine, width=1000, height=400)
+        self.frame_Combine.grid(column=2, row=0,rowspan=25,columnspan=10)
+
+        self.frame_Combine.grid_propagate(False)
+
+        self.frame_Combine.grid_rowconfigure(0, weight=1)
+        self.frame_Combine.grid_columnconfigure(0, weight=1)
+
+        self.frame_Combine.mytext_Extract = Text(self.frame_Combine, state="disabled")
+        self.frame_Combine.mytext_Extract.place(x=10, y=10, height=990, width=390)  
+
+        Label(self.tab_Combine, text='Combine spectrum name:').grid(row=2,column = 0)
+        self.CombineName = Entry(self.tab_Combine) 
+        self.CombineName.grid(row=2, column=1) 
+        self.CombineName.insert(END,'OutSpectrum.spec')
+
+
     def WavCal_GUI(self):
         
         self.WavCal_load_button = Button(self.tab_WavCal, text="Load arc files", width=20)
@@ -348,10 +380,15 @@ class simpleapp_tk(Tk):
         self.frame_WavCal.grid_propagate(False)
 
         self.frame_WavCal.grid_rowconfigure(0, weight=1)
-        self.frame_Extract.grid_columnconfigure(0, weight=1)
+        self.frame_WavCal.grid_columnconfigure(0, weight=1)
 
-        self.frame_WavCal.mytext_Extract = Text(self.frame_WavCal, state="disabled")
-        self.frame_WavCal.mytext_Extract.place(x=10, y=10, height=990, width=390)  
+        self.frame_WavCal.mytext_WaCal = Text(self.frame_WavCal, state="disabled")
+        self.frame_WavCal.mytext_WaCal.place(x=10, y=10, height=990, width=390)  
+        
+        Label(self.tab_WavCal, text='Wavelength calibrated spectrum name:').grid(row=4,column = 0)
+        self.WVName = Entry(self.tab_WavCal) 
+        self.WVName.grid(row=4, column=1) 
+        self.WVName.insert(END,'OutSpectrum.spec')
 
 
 
@@ -425,14 +462,67 @@ class simpleapp_tk(Tk):
     def WavCal(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        os.system('python ' + Pipe_Path + '/SP_WavCal.py ' +  + '-a ' + " ".join(self.files_WavCal))
+        print('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + '-a ' + " ".join(self.files_WavCal) + ' -m template' + ' -o ' +self.WVName.get())
+        os.system('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + ' -a ' + " ".join(self.files_WavCal) + ' -m template' + ' -o ' +self.WVName.get())
         self.now = datetime.datetime.now()
-        module_logger_WavCal.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
+        module_logger_WavCal.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Wavelength calibration done' )
         
         return None
 
 
 
+
+############################################################################## 
+# SP_Combine
+##############################################################################
+
+
+    def load_file_Combine(self, event):
+        self.fname = askopenfilenames()
+        self.now = datetime.datetime.now()
+        self.files_Combine=[]
+        for elem in self.fname:
+            module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1] )
+            self.files_Combine.append(elem)
+        
+#        self.read_all_fits(self.files_Extract)
+#        print(self.images[0])
+        
+#        self.canvas.delete("all")
+##        self.tkimage.forget()
+#        self.canvas.forget()
+#        
+#        
+#        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+#        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+#                             self.tkimage.width())
+#        self.canvas.pack()
+#        self.image = self.canvas.create_image(0, 0, anchor='nw',
+#                                              image=self.tkimage)  
+#        
+#              # select first image
+#        
+#        im = self.images[0]
+#        self.tkimage.paste(im)
+            
+        return None
+
+    def Combine(self, event):
+        now = datetime.datetime.now()
+        module_logger.info(now)
+        os.system('python ' + Pipe_Path + '/SP_Combine.py ' + " ".join(self.files_Combine) + ' -o ' + self.CombineName.get())
+        self.now = datetime.datetime.now()
+        module_logger_Extract.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Spectra combined' )
+        
+        return None
+
+
+
+        
+
+############################################################################## 
+# SP_Bckgsub
+##############################################################################
 
 
 ############################################################################## 
