@@ -51,6 +51,7 @@ module_logger_Preproc = logging.getLogger(__name__ + '.E')
 module_logger_CosmCorr = logging.getLogger(__name__ + '.F')
 module_logger_Bckgsub = logging.getLogger(__name__ + '.G')
 module_logger_Extract = logging.getLogger(__name__ + '.H')
+module_logger_WavCal = logging.getLogger(__name__ + '.I')
 
 
 
@@ -93,6 +94,9 @@ class simpleapp_tk(Tk):
 
         self.tab_Extract = Frame(self.TabControl)
         self.TabControl.add(self.tab_Extract,text='Spectra extraction')        
+
+        self.tab_WavCal = Frame(self.TabControl)
+        self.TabControl.add(self.tab_Extract,text='Wavelength calibration')   
         
         self.TabControl.pack(expand=1, fill="both") 
         
@@ -652,10 +656,10 @@ class simpleapp_tk(Tk):
 
         return None
 
-    def Prepare(self):
+    def Prepare(self,event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        os.system('python ' + Pipe_Path + '/SP_Prepare.py ' + " ".join(self.files))
+        os.system('python ' + Pipe_Path + '/SP_Prepare.py ' + " ".join(self.files_prepare))
         self.now = datetime.datetime.now()
         module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'File preparation done' )
         

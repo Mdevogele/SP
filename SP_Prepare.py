@@ -68,7 +68,7 @@ def Prepare(filenames,Verbose):
         if telescope == 'SOAR':
             hdulist = fits.open(filename)
             hdulist[0].data = hdulist[0].data[200:-200,:]
-            hdulist.writeto(filename,overwrite = True)
+            hdulist.writeto(filename,overwrite = True,checksum=False, output_verify='ignore')
 
 
     # identify keywords for GENERIC telescopes
