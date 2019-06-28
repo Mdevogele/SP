@@ -25,7 +25,7 @@ def Preproc(filenames,MasterBias,MasterFlat,Verbose,Suffix,Diagnostic):
     print(Object_in)
 
     ReducFlags = {'Bias': MasterBias, 
-                      'Flat':MasterFlat,'OutFilelist': Object_out,'OverWrite':True, 'Verbose' : True, 'IsGMOS': False}   
+                      'Flat':MasterFlat,'OutFilelist': Object_out,'OverWrite':True, 'Verbose' : True, 'IsGMOS': False, 'RawPath':''}   
        
     
     SP.Reduce(Object_in,**ReducFlags)
