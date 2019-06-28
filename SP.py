@@ -91,7 +91,7 @@ class simpleapp_tk(Tk):
         self.TabControl.add(self.tab_BckgSub,text='Background subtraction')
 
         self.tab_Extract = Frame(self.TabControl)
-        self.TabControl.add(self.tab_Extract,text='Spectre extraction')        
+        self.TabControl.add(self.tab_Extract,text='Spectra extraction')        
         
         self.TabControl.pack(expand=1, fill="both") 
         
