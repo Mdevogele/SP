@@ -96,7 +96,7 @@ class simpleapp_tk(Tk):
         self.TabControl.add(self.tab_Extract,text='Spectra extraction')        
 
         self.tab_WavCal = Frame(self.TabControl)
-        self.TabControl.add(self.tab_Extract,text='Wavelength calibration')   
+        self.TabControl.add(self.tab_WavCal,text='Wavelength calibration')   
         
         self.TabControl.pack(expand=1, fill="both") 
         
@@ -149,6 +149,7 @@ class simpleapp_tk(Tk):
         self.CosmCorr_GUI()
         self.BckgSub_GUI()
         self.Extract_GUI()
+        self.WavCal_GUI()
 
     def Prepare_GUI(self):
         
@@ -289,7 +290,7 @@ class simpleapp_tk(Tk):
         self.BckgSub_load_button.grid(row=0, column=0, sticky=W)  
         self.BckgSub_load_button.bind("<ButtonRelease-1>", self.load_file_bckgsub)    
  
-        self.BckgSub_run_button = Button(self.tab_BckgSub, text="Correct cosmics", width=20)
+        self.BckgSub_run_button = Button(self.tab_BckgSub, text="Remove background", width=20)
         self.BckgSub_run_button.grid(row=1, column=0, sticky=W)  
         self.BckgSub_run_button.bind("<ButtonRelease-1>", self.BckgSub)   
        
@@ -326,6 +327,111 @@ class simpleapp_tk(Tk):
 
         self.frame_Extract.mytext_Extract = Text(self.frame_Extract, state="disabled")
         self.frame_Extract.mytext_Extract.place(x=10, y=10, height=990, width=390)  
+
+    def WavCal_GUI(self):
+        
+        self.WavCal_load_button = Button(self.tab_WavCal, text="Load arc files", width=20)
+        self.WavCal_load_button.grid(row=0, column=0, sticky=W)  
+        self.WavCal_load_button.bind("<ButtonRelease-1>", self.load_file_WavCal)    
+
+        self.WavCal_Spec_load_button = Button(self.tab_WavCal, text="Load spec file", width=20)
+        self.WavCal_Spec_load_button.grid(row=2, column=0, sticky=W)  
+        self.WavCal_Spec_load_button.bind("<ButtonRelease-1>", self.load_file_WavCal_Spec)  
+ 
+        self.WavCal_run_button = Button(self.tab_WavCal, text="Calibrate wavelength", width=20)
+        self.WavCal_run_button.grid(row=3, column=0, sticky=W)  
+        self.WavCal_run_button.bind("<ButtonRelease-1>", self.WavCal)   
+       
+        self.frame_WavCal=Frame(self.tab_WavCal, width=1000, height=400)
+        self.frame_WavCal.grid(column=2, row=0,rowspan=25,columnspan=10)
+
+        self.frame_WavCal.grid_propagate(False)
+
+        self.frame_WavCal.grid_rowconfigure(0, weight=1)
+        self.frame_Extract.grid_columnconfigure(0, weight=1)
+
+        self.frame_WavCal.mytext_Extract = Text(self.frame_WavCal, state="disabled")
+        self.frame_WavCal.mytext_Extract.place(x=10, y=10, height=990, width=390)  
+
+
+
+############################################################################## 
+# SP_WavCal
+##############################################################################
+
+
+    def load_file_WavCal(self, event):
+        self.fname = askopenfilenames()
+        self.now = datetime.datetime.now()
+        self.files_WavCal=[]
+        for elem in self.fname:
+            module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
+            self.files_WavCal.append(elem)
+        
+        self.read_all_fits(self.files_WavCal)
+        print(self.images[0])
+        
+        self.canvas.delete("all")
+#        self.tkimage.forget()
+        self.canvas.forget()
+        
+        
+        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+                             self.tkimage.width())
+        self.canvas.pack()
+        self.image = self.canvas.create_image(0, 0, anchor='nw',
+                                              image=self.tkimage)  
+        
+              # select first image
+        
+        im = self.images[0]
+        self.tkimage.paste(im)
+            
+        return None
+
+    def load_file_WavCal_Spec(self, event):
+        self.fname = askopenfilenames()
+        self.now = datetime.datetime.now()
+        self.files_WavCal_Spec=[]
+        for elem in self.fname:
+            module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
+            self.files_WavCal_Spec.append(elem)
+        
+#        self.read_all_fits(self.files_WavCal)
+#        print(self.images[0])
+#        
+#        self.canvas.delete("all")
+##        self.tkimage.forget()
+#        self.canvas.forget()
+#        
+#        
+#        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+#        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+#                             self.tkimage.width())
+#        self.canvas.pack()
+#        self.image = self.canvas.create_image(0, 0, anchor='nw',
+#                                              image=self.tkimage)  
+#        
+#              # select first image
+#        
+#        im = self.images[0]
+#        self.tkimage.paste(im)
+            
+        return None
+
+
+
+    def WavCal(self, event):
+        now = datetime.datetime.now()
+        module_logger.info(now)
+        os.system('python ' + Pipe_Path + '/SP_WavCal.py ' +  + '-a ' + " ".join(self.files_WavCal))
+        self.now = datetime.datetime.now()
+        module_logger_WavCal.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
+        
+        return None
+
+
 
 
 
