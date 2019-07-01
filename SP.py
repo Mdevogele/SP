@@ -53,6 +53,7 @@ module_logger_Bckgsub = logging.getLogger(__name__ + '.G')
 module_logger_Extract = logging.getLogger(__name__ + '.H')
 module_logger_Combine = logging.getLogger(__name__ + '.I')
 module_logger_WavCal = logging.getLogger(__name__ + '.J')
+module_logger_TellCorr = logging.getLogger(__name__ + '.K')
 
 
 
@@ -101,6 +102,9 @@ class simpleapp_tk(Tk):
 
         self.tab_WavCal = Frame(self.TabControl)
         self.TabControl.add(self.tab_WavCal,text='Wavelength calibration')   
+
+        self.tab_TellCorr = Frame(self.TabControl)
+        self.TabControl.add(self.tab_TellCorr,text='Telluric correction')   
         
         self.TabControl.pack(expand=1, fill="both") 
         
@@ -155,6 +159,7 @@ class simpleapp_tk(Tk):
         self.Extract_GUI()
         self.Combine_GUI()
         self.WavCal_GUI()
+        self.TellCorr_GUI()
 
     def Prepare_GUI(self):
         
@@ -389,6 +394,117 @@ class simpleapp_tk(Tk):
         self.WVName = Entry(self.tab_WavCal) 
         self.WVName.grid(row=4, column=1) 
         self.WVName.insert(END,'OutSpectrum.spec')
+
+
+    def TellCorr_GUI(self):
+        
+        self.TellCorr_load_button = Button(self.tab_TellCorr, text="Load asteroid spectrum", width=20)
+        self.TellCorr_load_button.grid(row=0, column=0, sticky=W)  
+        self.TellCorr_load_button.bind("<ButtonRelease-1>", self.load_file_TellCorr)    
+
+        self.TellCorr_Spec_load_button = Button(self.tab_TellCorr, text="Load standard spectrum", width=20)
+        self.TellCorr_Spec_load_button.grid(row=2, column=0, sticky=W)  
+        self.TellCorr_Spec_load_button.bind("<ButtonRelease-1>", self.load_file_TellCorr_Spec)  
+ 
+        self.TellCorr_run_button = Button(self.tab_TellCorr, text="Correct", width=20)
+        self.TellCorr_run_button.grid(row=3, column=0, sticky=W)  
+        self.TellCorr_run_button.bind("<ButtonRelease-1>", self.TellCorr)   
+       
+        self.frame_TellCorr=Frame(self.tab_WavCal, width=1000, height=400)
+        self.frame_TellCorr.grid(column=2, row=0,rowspan=25,columnspan=10)
+
+        self.frame_TellCorr.grid_propagate(False)
+
+        self.frame_TellCorr.grid_rowconfigure(0, weight=1)
+        self.frame_TellCorr.grid_columnconfigure(0, weight=1)
+
+        self.frame_TellCorr.mytext_TellCorr = Text(self.frame_TellCorr, state="disabled")
+        self.frame_TellCorr.mytext_TellCorr.place(x=10, y=10, height=990, width=390)  
+        
+        Label(self.tab_TellCorr, text='Output spectrum name:').grid(row=4,column = 0)
+        self.SpName = Entry(self.tab_TellCorr) 
+        self.SpName.grid(row=4, column=1) 
+        self.SpName.insert(END,'OutSpectrum.spec')
+
+
+
+
+############################################################################## 
+# SP_TellCorr
+##############################################################################
+
+
+    def load_file_TellCorr(self, event):
+        self.fname = askopenfilenames()
+        self.now = datetime.datetime.now()
+        self.files_TellCorr=[]
+        for elem in self.fname:
+            module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
+            self.files_TellCorr.append(elem)
+        
+#        self.read_all_fits(self.files_TellCorr)
+#        print(self.images[0])
+#        
+#        self.canvas.delete("all")
+##        self.tkimage.forget()
+#        self.canvas.forget()
+#        
+#        
+#        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+#        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+#                             self.tkimage.width())
+#        self.canvas.pack()
+#        self.image = self.canvas.create_image(0, 0, anchor='nw',
+#                                              image=self.tkimage)  
+#        
+#              # select first image
+#        
+#        im = self.images[0]
+#        self.tkimage.paste(im)
+            
+        return None
+
+    def load_file_TellCorr_Spec(self, event):
+        self.fname = askopenfilenames()
+        self.now = datetime.datetime.now()
+        self.files_TellCorr_Spec=[]
+        for elem in self.fname:
+            module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
+            self.files_TellCorr_Spec.append(elem)
+        
+#        self.read_all_fits(self.files_WavCal)
+#        print(self.images[0])
+#        
+#        self.canvas.delete("all")
+##        self.tkimage.forget()
+#        self.canvas.forget()
+#        
+#        
+#        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+#        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+#                             self.tkimage.width())
+#        self.canvas.pack()
+#        self.image = self.canvas.create_image(0, 0, anchor='nw',
+#                                              image=self.tkimage)  
+#        
+#              # select first image
+#        
+#        im = self.images[0]
+#        self.tkimage.paste(im)
+            
+        return None
+
+
+
+    def TellCorr(self, event):
+        now = datetime.datetime.now()
+        module_logger.info(now)
+        print('python ' + Pipe_Path + '/SP_TellCorr.py ' + " ".join(self.files_TellCorr)  + '-s ' + " ".join(self.files_TellCorr_Spec) + ' -t ' +self.SpName.get() + ' -i DeVeny')
+        os.system('python ' + Pipe_Path + '/SP_TellCorr.py ' + " ".join(self.files_TellCorr)  + ' -s ' + " ".join(self.files_TellCorr_Spec) + ' -t ' +self.SpName.get() + ' -i DeVeny')
+        self.now = datetime.datetime.now()
+        module_logger_WavCal.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Wavelength calibration done' )
+        
+        return None
 
 
 
