@@ -499,8 +499,8 @@ class simpleapp_tk(Tk):
     def TellCorr(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        print('python ' + Pipe_Path + '/SP_TellCorr.py ' + " ".join(self.files_TellCorr)  + '-s ' + " ".join(self.files_TellCorr_Spec) + ' -t ' +self.SpName.get() + ' -i DeVeny')
-        os.system('python ' + Pipe_Path + '/SP_TellCorr.py ' + " ".join(self.files_TellCorr)  + ' -s ' + " ".join(self.files_TellCorr_Spec) + ' -t ' +self.SpName.get() + ' -i DeVeny')
+        print('python ' + Pipe_Path + '/SP_TellCorr.py ' + " ".join(self.files_TellCorr)  + ' -s ' + " ".join(self.files_TellCorr_Spec)  + ' -i Deveny')
+        os.system('python ' + Pipe_Path + '/SP_TellCorr.py ' + " ".join(self.files_TellCorr)  + ' -s ' + " ".join(self.files_TellCorr_Spec) + ' -i Deveny')
         self.now = datetime.datetime.now()
         module_logger_WavCal.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Wavelength calibration done' )
         
@@ -759,7 +759,7 @@ class simpleapp_tk(Tk):
         module_logger.info(now)
         os.system('python ' + Pipe_Path + '/SP_BckgSub.py ' + " ".join(self.files_bckgsub))
         self.now = datetime.datetime.now()
-        module_logger_bckgsub.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
+        module_logger_Bckgsub.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
         
         return None
 
