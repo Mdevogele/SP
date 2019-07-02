@@ -19,6 +19,8 @@ import datetime
 
 from past.utils import old_div
 
+import operator
+
 
 from PIL import Image
 from PIL import ImageTk
@@ -31,6 +33,7 @@ from scipy.ndimage import interpolation as interp
 
 from scipy import misc
 
+from scipy.optimize import curve_fit
 
 import time
 from datetime import date
@@ -535,7 +538,12 @@ class simpleapp_tk(Tk):
         self.canvas.pack()
         self.image = self.canvas.create_image(0, 0, anchor='nw',
                                               image=self.tkimage)  
-        
+
+                # events
+        self.canvas.focus_set()
+        self.canvas.bind("<Key>", self.key)
+        self.canvas.bind("<Button 1>", self.left_click)
+        self.canvas.bind("<Button 2>", self.right_click)        
               # select first image
         
         im = self.images[0]
@@ -578,8 +586,8 @@ class simpleapp_tk(Tk):
     def WavCal(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        print('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + '-a ' + " ".join(self.files_WavCal) + ' -m template' + ' -o ' +self.WVName.get())
-        os.system('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + ' -a ' + " ".join(self.files_WavCal) + ' -m template' + ' -o ' +self.WVName.get())
+        print('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + '-a ' + " ".join(self.files_WavCal) + ' -m template' + ' -o ' + os.path.split(self.files_WavCal[0])[0] + '/' + self.WVName.get())
+        os.system('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + ' -a ' + " ".join(self.files_WavCal) + ' -m template' + ' -o ' + os.path.split(self.files_WavCal[0])[0] + '/' + self.WVName.get())
         self.now = datetime.datetime.now()
         module_logger_WavCal.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Wavelength calibration done' )
         
@@ -626,7 +634,7 @@ class simpleapp_tk(Tk):
     def Combine(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        os.system('python ' + Pipe_Path + '/SP_Combine.py ' + " ".join(self.files_Combine) + ' -o ' + self.CombineName.get())
+        os.system('python ' + Pipe_Path + '/SP_Combine.py ' + " ".join(self.files_Combine) + ' -o ' + os.path.split(self.files_Combine[0])[0] + '/' + self.CombineName.get())
         self.now = datetime.datetime.now()
         module_logger_Extract.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Spectra combined' )
         
@@ -671,8 +679,18 @@ class simpleapp_tk(Tk):
         
               # select first image
         
-        im = self.images[0]
+        self.index = 0
+        im = self.images[self.index]
         self.tkimage.paste(im)
+       
+        
+        # events
+        self.canvas.focus_set()
+        self.canvas.bind("<Key>", self.key)
+        self.canvas.bind("<Button 1>", self.left_click)
+        self.canvas.bind("<Button 2>", self.right_click)
+        
+        
             
         return None
 
@@ -748,10 +766,16 @@ class simpleapp_tk(Tk):
                                               image=self.tkimage)  
         
               # select first image
-        
-        im = self.images[0]
+
+        self.index = 0        
+        im = self.images[self.index]
         self.tkimage.paste(im)
-            
+        
+        # events
+        self.canvas.focus_set()
+        self.canvas.bind("<Key>", self.key)
+        self.canvas.bind("<Button 1>", self.left_click)
+        self.canvas.bind("<Button 2>", self.right_click)           
         return None
 
     def BckgSub(self, event):
@@ -793,11 +817,16 @@ class simpleapp_tk(Tk):
                                               image=self.tkimage)  
         
               # select first image
-        
-        im = self.images[0]
+ 
+        self.index = 0       
+        im = self.images[self.index]
         self.tkimage.paste(im)
 
-
+                # events
+        self.canvas.focus_set()
+        self.canvas.bind("<Key>", self.key)
+        self.canvas.bind("<Button 1>", self.left_click)
+        self.canvas.bind("<Button 2>", self.right_click)
 
         return None
 
@@ -839,9 +868,15 @@ class simpleapp_tk(Tk):
         
               # select first image
         
-        im = self.images[0]
+        self.index = 0;
+        im = self.images[self.index]
         self.tkimage.paste(im)
 
+                # events
+        self.canvas.focus_set()
+        self.canvas.bind("<Key>", self.key)
+        self.canvas.bind("<Button 1>", self.left_click)
+        self.canvas.bind("<Button 2>", self.right_click)
 
         return None
 
@@ -885,11 +920,16 @@ class simpleapp_tk(Tk):
                                               image=self.tkimage)  
         
               # select first image
-        
-        im = self.images[0]
+
+        self.index = 0        
+        im = self.images[self.index]
         self.tkimage.paste(im)
 
-
+                # events
+        self.canvas.focus_set()
+        self.canvas.bind("<Key>", self.key)
+        self.canvas.bind("<Button 1>", self.left_click)
+        self.canvas.bind("<Button 2>", self.right_click)
 
         return None
 
@@ -931,12 +971,18 @@ class simpleapp_tk(Tk):
                              self.tkimage.width())
         self.canvas.pack()
         self.image = self.canvas.create_image(0, 0, anchor='nw',
-                                              image=self.tkimage)  
-        
+                                              image=self.tkimage)       
               # select first image
         
-        im = self.images[0]
+        self.index = 0
+        im = self.images[self.index]
         self.tkimage.paste(im)
+        
+                        # events
+        self.canvas.focus_set()
+        self.canvas.bind("<Key>", self.key)
+        self.canvas.bind("<Button 1>", self.left_click)
+        self.canvas.bind("<Button 2>", self.right_click)
 
 
         return None
@@ -1008,7 +1054,107 @@ class simpleapp_tk(Tk):
 
 
 
+### Event listener
+    def left_click(self,event):
+        print(event.x,event.y)
+        x, y = old_div(event.x,self.zoom), old_div(event.y,self.zoom) 
+        print(x,y)
+        self.x = x
+        self.y = y
 
+    def right_click(self, event):
+        """ select source """
+        x, y = old_div(event.x,self.zoom), old_div(event.y,self.zoom)
+
+    def key(self, event):
+        """ keyboard events """
+        if event.char == 'a':
+            # previous frame
+            self.nextframe()
+        elif event.char == 'q':
+            # quit
+            self.top.quit()
+            
+        elif event.char == 'f':
+            self.Fit_Spectrum(self.data[self.index],self.x,self.y,30)
+
+
+    def nextframe(self):
+        """ display frame using iterator i"""
+
+        self.canvas.delete("all")
+#        self.tkimage.forget()
+        self.canvas.forget()
+        
+        
+        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+                             self.tkimage.width())
+        self.canvas.pack()
+        self.image = self.canvas.create_image(0, 0, anchor='nw',
+                                              image=self.tkimage)  
+        
+              # select first image
+        
+                # events
+        self.canvas.focus_set()
+        self.canvas.bind("<Key>", self.key)
+        self.canvas.bind("<Button 1>", self.left_click)
+        self.canvas.bind("<Button 2>", self.right_click)
+        
+        
+        self.index += 1
+        if self.index>=len(self.images):
+            self.index -= len(self.images)
+        print(self.index)
+        im = self.images[self.index]
+        self.tkimage.paste(im)
+
+
+
+    def Fit_Spectrum(self,image,x,y,box):
+
+
+        def MOFFAT(x, *p):
+            S0,S1,a, b, x0 = p
+            bb = S0+S1/(1+(x-x0)**2/a**2)**b
+            
+            return bb
+        
+        X = []
+        Y = []
+        
+        print(x,y)
+        D = image[int(y)-box:int(y)+box,int(x)-box:int(x)+box]
+        
+        Line = np.median(D,axis=1)
+        
+        
+        xs = range(len(Line))
+        ys = Line
+        
+        max_index, max_value = max(enumerate(Line), key=operator.itemgetter(1))
+        
+        p0 = [0,max_value,2.24,1.41,max_index] 
+        Res = []
+
+        coeff, var_matrix = curve_fit(lambda x, S0,S1,a, b,x0: MOFFAT(x, S0,S1,a, b,x0),xs,ys,p0,maxfev = 100000)
+        fit = MOFFAT(xs, *coeff)
+        print(fit)
+        
+        FWHM = 2*coeff[2]*np.sqrt(2**(1/coeff[3])-1)
+        
+        region = sum(Line>(coeff[0]+50))/2
+        
+        
+        fig, ax = plt.subplots()
+        plt.plot(Line,Label = 'Spectrum')
+        plt.plot(fit,Label = 'Fit')
+        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        ax.text(0.1, 0.9,'FWHM = ' + str(round(FWHM,1)) + ' pix',transform=ax.transAxes,fontsize=14,verticalalignment='top', bbox=props)
+        ax.text(0.1, 0.8,'Trace = ' + str(region) + ' pix',transform=ax.transAxes,fontsize=14,verticalalignment='top', bbox=props)
+        plt.legend()
+        plt.show()
 
 
 class MyHandlerText(logging.StreamHandler):

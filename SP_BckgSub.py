@@ -13,7 +13,6 @@ import simplejson
 
 import SP_diagnostics as diag
 
-
 from SP_CheckInstrument import CheckInstrument
 
 import numpy as np
@@ -50,7 +49,7 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
             X = range(image.shape[0])
             X = np.array(X)
             
-            
+            Fdc = []
             for i in range(image.shape[1]):
                 index = np.argwhere(np.isnan(image2[:,i]))
                 image2[index,i]=0
@@ -58,10 +57,11 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
                 XX = np.ma.masked_array(X,image3.mask)
                 z = np.ma.polyfit(XX,image3 , 1)
                 p = np.poly1d(z)
+                Fdc.append(p(Center))
                 image[:,i] = image[:,i] - p(X)
             Out_File.append(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits')
-            hdulist.writeto(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits')
-
+            hdulist.writeto(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits',overwrite = True )
+            np.savetxt(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.txt',Fdc)
         if telescope == 'GMOSS' or telescope == 'GMOSN':
             DetecFlags = {'Instrument':'GMOS'}
             OffFile = Spec_loc + '_Offset.txt'
@@ -108,7 +108,7 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
                 p = np.poly1d(z)
                 image[:,i] = image[:,i] - p(X)
             
-            hdulist.writeto(elem.replace('.fits','').replace('_Procc','').replace('Sub','') + '_' + Suffix + '.fits')
+            hdulist.writeto(elem.replace('.fits','').replace('_Procc','').replace('Sub','') + '_' + Suffix + '.fits', v)
             Out_File.append(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits')
             
     if Diagnostic: 

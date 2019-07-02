@@ -25,44 +25,53 @@ def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
 
         Spec = np.loadtxt(elem).transpose()     
         
-        if np.size(Spec,0) != 2:
-            print('ERROR: Wrong asteroid spectrum file')
-            print('ERROR: It is not a two columns text file')
-            print('ERROR: SP_TellCorr takes as argument the output of SP_WavCal')
-            return
+#        if np.size(Spec,0) != 2:
+#            print('ERROR: Wrong asteroid spectrum file')
+#            print('ERROR: It is not a two columns text file')
+#            print('ERROR: SP_TellCorr takes as argument the output of SP_WavCal')
+#            return
         
         Wav = Spec[0]
         SpecA = Spec[1]
+        ErrA = Spec[2]
         
         
         idx = (Wav>0.505)*(Wav<0.605)
         index = np.where(idx)
-        SpecA = SpecA/np.nanmedian(SpecA[index])
+        MedA = np.nanmedian(SpecA[index])
+        SpecA = SpecA/MedA
+        ErrA = ErrA/MedA
     
         
         Spec = np.loadtxt(Std).transpose()     
 
-        if np.size(Spec,0) != 2:
-            print('ERROR: Wrong solar analog spectrum file')
-            print('ERROR: It is not a two columns text file')
-            print('ERROR: SP_TellCorr takes as argument the output of SP_WavCal')
-            return
+#        if np.size(Spec,0) != 2:
+#            print('ERROR: Wrong solar analog spectrum file')
+#            print('ERROR: It is not a two columns text file')
+#            print('ERROR: SP_TellCorr takes as argument the output of SP_WavCal')
+#            return
 
         WavSA = Spec[0]
         SpecSA = Spec[1]
+        ErrSA = Spec[2]
     
-        SpecSA = SpecSA/np.nanmedian(SpecSA[index])
+        MedSA = np.nanmedian(SpecSA[index])
+        SpecSA = SpecSA/MedSA
+        ErrSA = ErrSA/MedSA
     
         Wavel = [Wav, Wav]
         Spectre = [SpecA, SpecSA]
+        Err = [ErrA,ErrSA]
     
-        SpecN, WavN = SP.Shift_Spec(Spectre,Wavel,**DetecFlags)
+        SpecN,ErrN, WavN = SP.Shift_Spec(Spectre,Err,Wavel,**DetecFlags)
         
         SpecA = SpecN[0]
         SpecSA = SpecN[1]
-    
+        ErrNA = ErrN[0]
+        ErrNSA = ErrN[1]
     
         Spec = SpecA/SpecSA
+        Error = np.sqrt(((ErrNA/SpecA)**2+(ErrNSA/SpecSA)**2))*Spec
         WavNew = np.array(WavN[0])
         
         
@@ -77,11 +86,13 @@ def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
      #       plt.savefig('spec.jpg',dpi=1200)
             plt.savefig(Target + '_' + Date + '_' + 'DCT' + '_spec.jpg',dpi=1200)
         
-            f = open(Target + '.spec','w')
-            for wavel, refl in zip(WavNew[10:-10],Spec[10:-10]):
-                if not math.isnan(refl):
-                    f.write(str(wavel)+ '\t' + str(refl) + '\n')
-            f.close()
+            np.savetxt(Target + '.spec',np.array([WavNew[10:-10],Spec[10:-10],Error[10:-10]]).transpose())
+        
+#            f = open(Target + '.spec','w')
+#            for wavel, refl in zip(WavNew[10:-10],Spec[10:-10]):
+#                if not math.isnan(refl):
+#                    f.write(str(wavel)+ '\t' + str(refl) + '\n')
+#            f.close()
          
         if 'GMOS' in Instrument:
             f = open(Target + '.spec','w')

@@ -25,7 +25,11 @@ import sqlite3
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import interp1d
-import imreg_dft as ird
+try:
+    import imreg_dft as ird
+except ImportError:
+    print('Module imreg_dft not found. Please install with: pip install imreg_dft')
+    sys.exit()
 from scipy.optimize import curve_fit
 import itertools
 import datetime
@@ -1144,7 +1148,7 @@ def Wav_Cal2(Arc ,**kw):
 
     return Wav
 
-def Shift_Spec(Spectre,Wavel,**kw):
+def Shift_Spec(Spectre,Err,Wavel,**kw):
     
     if 'Instrument'  in kw:
         Instrument = kw['Instrument']
@@ -1187,6 +1191,7 @@ def Shift_Spec(Spectre,Wavel,**kw):
         
         SpectreN = [Spectre[0][10:-10],SpecN]
         WavelN = [Wavel[0][10:-10],Wavel[0][10:-10]]
+        ErrN = [Err[0][10:-10],Err[1][10:-10]]  
         
     if Instrument == 'GMOS':
 
@@ -1216,9 +1221,10 @@ def Shift_Spec(Spectre,Wavel,**kw):
         SpecN = f2(Wavel[1][10:-10]-Shift)
         
         SpectreN = [Spectre[0][10:-10],SpecN]
-        WavelN = [Wavel[0][10:-10],Wavel[0][10:-10]]    
+        WavelN = [Wavel[0][10:-10],Wavel[0][10:-10]]   
+        ErrN = [Err[0][10:-10],Err[1][10:-10]]  
     
-    return SpectreN, WavelN;
+    return SpectreN, ErrN, WavelN;
     
     
     

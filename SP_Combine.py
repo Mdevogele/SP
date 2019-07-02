@@ -11,20 +11,37 @@ import _SP_conf
 
 def Combine_Spectra(filenames,OutFile,Verbose):
 
-    SpecT = [] 
+    Spe = [] 
     for elem in filenames:
-        with open(elem,'r') as f:
-            SpecT.append(f.read().splitlines())
-    SpecT = np.array(SpecT).astype(float)
+        try:         
+            Spe.append(np.loadtxt(elem).transpose())
+        except UnicodeDecodeError:
+            print('***************************************************')
+            print('ERROR: the input files do not seem to be text files')
+            print('***************************************************')
+            return
+
+    Spe = np.array(Spe)
+
+    SpecT = np.array(Spe[:,0]).astype(float)
     SpecT[SpecT<=0] = np.nan
     SpecT[SpecT>10] = np.nan
+    Err = np.array(Spe[:,1])
+    Error = []
     for idx,elem in enumerate(SpecT):
-        SpecT[idx] = SpecT[idx]/np.nanmedian(SpecT[idx][1300:1500])
+        Med  = np.nanmedian(SpecT[idx][1300:1500])
+        SpecT[idx] = SpecT[idx]/Med
+        Err[idx] = Err[idx]/Med
     SpecTT = np.nanmedian(SpecT,axis=0)
-    f = open(OutFile,'w')
-    for item in SpecTT:
-      f.write("%s\n" % item)
-    f.close()
+    Error = np.sqrt(np.sum(Err**2,axis=0))/(np.size(Err,axis=0))
+    print(Error)
+    print(OutFile)
+    np.savetxt(OutFile,np.array([SpecTT,Error]).transpose())
+    
+#    f = open(OutFile,'w')
+#    for item in SpecTT:
+#      f.write("%s\n" % item)
+#    f.close()
     
     
     

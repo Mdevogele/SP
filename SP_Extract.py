@@ -30,13 +30,20 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM):
     DetecFlags = {'Instrument':telescope}
     if telescope == 'DEVENY' or telescope == 'SOAR':
         for elem in filename:
+            # Read the fits file 
             hdulist = fits.open(elem)
+            # Extract data from the fits file
             data = hdulist[0].data
+            # Import the extracted background for errorbar computation
+            Bckg = np.loadtxt(elem.replace('.fits','.txt'))
+            
+            # Check the telescope which is used
             if telescope == 'DEVENY':
                 DetecFlags = {'Instrument':'Deveny'}  
             if telescope == 'SOAR':
                 DetecFlags = {'Instrument':'Soar'}  
 
+            # Try to detect the spectrum to extract 
             Center = SP.Detect_Spectra(data,Bin=2,**DetecFlags)
             Start = (1415,Center)
             
@@ -50,7 +57,7 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM):
                     TR.append(data[0:90,idx])
             TR = np.array(TR)
             hdulist[0].data = np.transpose(TR)
-            hdulist.writeto(elem.replace('.fits','') + 'Trace.fits' )
+            hdulist.writeto(elem.replace('.fits','') + 'Trace.fits',overwrite = True)
             Out_Files.append(elem.replace('.fits','') + 'Trace.fits')
 
             SSpec = []
@@ -62,13 +69,20 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM):
             Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=Spec_FWHM,Mask = MASK1,**DetecFlags)
             
 #            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=50,Mask = MASK1,**DetecFlags)
-            Spec1N = Spec1/np.abs(np.nanmedian(Spec1[1500:1600]))
-            f = open(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt','w')
-            Out_Spec.append(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt')
-            for item in Spec1N:
-                f.write("%s\n" % item)
-            
-            f.close()
+            print(Bckg)
+            Err = np.sqrt(Spec1*2.1) + np.sqrt(Spec_FWHM*Bckg*2.1) + np.sqrt(4)
+            Err = Err/2.1
+            # Normalization of the spectrum 
+            Median = np.abs(np.nanmedian(Spec1[1500:1600]))
+            Spec1N = Spec1/Median
+            Err= Err/Median
+            fname = elem.replace('.fits','.txt')
+            np.savetxt(fname, np.array([Spec1N,Err]).transpose())
+#            f = open(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt','w')
+#            Out_Spec.append(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt')
+#            for item in Spec1N:
+#                f.write("%s\n" % item)
+#            f.close()
     if telescope == 'GMOSS' or telescope == 'GMOSN':
         OffFile = Spec_loc + '_Offset.txt'
         with open(OffFile,'r') as f:

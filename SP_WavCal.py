@@ -31,6 +31,8 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
     
     print(telescope)
     
+    SpecA = np.loadtxt(filenames[0]).transpose()
+    SpecA = np.array(SpecA)
     
     if Method == 'template':
     
@@ -52,18 +54,22 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
         Wav = SP.Wav_Cal2(Arcs,**DetecFlags)
         Wav = np.array(Wav)
         Wav = Wav/10000
-        Wav = np.flip(Wav,axis=0)
+#        Wav = np.flip(Wav,axis=0)
         print(Wav)
         
           
-        with open(filenames[0],'r') as f:
-            SpecA = f.read().splitlines()  
+#        with open(filenames[0],'r') as f:
+#            SpecA = f.read().splitlines()  
         
-        SpecA = np.flip(SpecA,axis=0)
+#        SpecA = np.loadtxt(filenames[0]).transpose()
+#        SpecA = np.array(SpecA)
+#        SpecA = np.flip(SpecA,axis=0)
         
-        f = open(OutFile,'w')
-        for Wave,Spec in zip(Wav,SpecA):
-          f.write("{} \t {} \n".format(Wave,Spec))
+#        f = open(OutFile,'w')
+#        for Wave,Spec in zip(Wav,SpecA):
+#          f.write("{} \t {} \n".format(Wave,Spec))
+          
+        np.savetxt(OutFile,np.array([Wav,SpecA[0,:],SpecA[1,:]]).transpose())
           
     if Method == 'auto':
         Dim = []
