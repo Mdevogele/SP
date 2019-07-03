@@ -22,6 +22,7 @@ from past.utils import old_div
 import operator
 
 import SP_BckgSub
+import SP_Extract
 
 from PIL import Image
 from PIL import ImageTk
@@ -344,6 +345,13 @@ class simpleapp_tk(Tk):
 
         self.frame_Extract.mytext_Extract = Text(self.frame_Extract, state="disabled")
         self.frame_Extract.mytext_Extract.place(x=10, y=10, height=990, width=390)  
+
+        Label(self.tab_Extract, text='# of pixel to extract:').grid(row=3,column = 0)
+        self.FWHM = Entry(self.tab_Extract) 
+        self.FWHM.grid(row=3, column=1) 
+        self.FWHM.insert(END,'6')
+
+
 
     def Combine_GUI(self):
         
@@ -694,7 +702,8 @@ class simpleapp_tk(Tk):
     def Extract(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        os.system('python ' + Pipe_Path + '/SP_Extract.py ' + " ".join(self.files_Extract))
+        SP_Extract.Extract_Spectrum(self.files_Extract,False,'bla',False,int(self.FWHM.get()))
+#        os.system('python ' + Pipe_Path + '/SP_Extract.py ' + " ".join(self.files_Extract))
         self.now = datetime.datetime.now()
         module_logger_Extract.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
         
