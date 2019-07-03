@@ -17,7 +17,24 @@ from SP_CheckInstrument import CheckInstrument
 
 import numpy as np
 
-def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,350]):
+
+from tkinter import *
+from tkinter import ttk
+from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askopenfilenames
+from tkinter.messagebox import showerror
+
+from PIL import Image
+from PIL import ImageTk
+from PIL import ImageDraw
+
+
+
+from past.utils import old_div
+from scipy.ndimage import interpolation as interp
+
+
+def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,350],test = 0, Live = False):
    
     telescope, obsparam = CheckInstrument([FileName[0]])
     Out_File = []
@@ -50,6 +67,24 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
             X = np.array(X)
             
             Fdc = []
+            
+            if Live:
+                median = np.median(image[int(image.shape[1]*0.25):
+                                             int(image.shape[1]*0.75),
+                                             int(image.shape[0]*0.25):
+                                             int(image.shape[0]*0.75)])
+                std    = np.std(image[int(image.shape[1]*0.25):
+                                          int(image.shape[1]*0.75),
+                                          int(image.shape[0]*0.25):
+                                          int(image.shape[0]*0.75)])
+    
+                imgdat= image
+                imgdat = old_div(np.clip(imgdat, median-0.5*std,
+                                   median+0.5*std),(old_div(std,256)))
+                imgdat = imgdat - np.min(imgdat)
+    
+                imgdat = interp.zoom(imgdat, test.zoom)            
+            
             for i in range(image.shape[1]):
                 index = np.argwhere(np.isnan(image2[:,i]))
                 image2[index,i]=0
@@ -59,6 +94,31 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
                 p = np.poly1d(z)
                 Fdc.append(p(Center))
                 image[:,i] = image[:,i] - p(X)
+                
+                if Live: 
+                    imgdat[:,int(i/2)] = old_div(np.clip(interp.zoom(image[:,i], test.zoom),0,100),(old_div(100,256)))
+                    
+                    test.images[test.index] = Image.fromarray(imgdat)
+                    test.canvas.update()
+                    test.canvas.delete("all")
+                    test.canvas.forget()
+            
+            
+                    test.tkimage = ImageTk.PhotoImage(test.images[0], palette=256)
+                    test.canvas = Canvas(test.frame_fits, height=test.tkimage.height(), width=
+                                 test.tkimage.width())
+                    test.canvas.pack()
+                    test.image = test.canvas.create_image(0, 0, anchor='nw',
+                                                  image=test.tkimage)  
+            
+                  # select first image
+            
+                    test.index = 0
+                    im = test.images[test.index]
+                    test.tkimage.paste(im)                
+                    test.canvas.update()
+                
+                   
             Out_File.append(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits')
             hdulist.writeto(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits',overwrite = True )
             np.savetxt(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.txt',Fdc)
@@ -148,6 +208,7 @@ if __name__ == '__main__':
     
     parser.add_argument('-g',
                         help='Generic name of the offset and spectra location')
+    
     parser.add_argument('images', help='images to process or \'all\'',
                         nargs='+')
 
@@ -168,5 +229,5 @@ if __name__ == '__main__':
     
     
     # call run_the_pipeline only on filenames
-    BckgSub(filenames,Verbose,Method,Suffix,Spec_loc,Diagnostic,Ran)
+    BckgSub(filenames,Verbose,Method,Suffix,Spec_loc,Diagnostic,Area = Ran, test = 0, Live = False)
     pass

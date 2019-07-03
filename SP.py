@@ -21,6 +21,7 @@ from past.utils import old_div
 
 import operator
 
+import SP_BckgSub
 
 from PIL import Image
 from PIL import ImageTk
@@ -318,6 +319,9 @@ class simpleapp_tk(Tk):
         self.frame_BckgSub.mytext_BckgSub = Text(self.frame_BckgSub, state="disabled")
         self.frame_BckgSub.mytext_BckgSub.place(x=10, y=10, height=990, width=390)  
               
+        
+        self.Live_BckgSub = IntVar()
+        self.Check_Live_BckgSub = Checkbutton(self.tab_BckgSub, text="Live processing", variable=self.Live_BckgSub).grid(column = 0,row=2)
 
 
     def Extract_GUI(self):
@@ -642,13 +646,6 @@ class simpleapp_tk(Tk):
 
 
 
-        
-
-############################################################################## 
-# SP_Bckgsub
-##############################################################################
-
-
 ############################################################################## 
 # SP_Extract
 ##############################################################################
@@ -733,6 +730,8 @@ class simpleapp_tk(Tk):
                                       int(imgdat.shape[0]*0.25):
                                       int(imgdat.shape[0]*0.75)])
 
+            print(median,std)
+    
             imgdat = old_div(np.clip(imgdat, median-0.5*std,
                                 median+0.5*std),(old_div(std,256)))
             imgdat = imgdat - np.min(imgdat)
@@ -781,7 +780,10 @@ class simpleapp_tk(Tk):
     def BckgSub(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        os.system('python ' + Pipe_Path + '/SP_BckgSub.py ' + " ".join(self.files_bckgsub))
+        print(self.Live_BckgSub.get())
+        print(bool(self.Live_BckgSub.get()))
+        SP_BckgSub.BckgSub(self.files_bckgsub,True,'auto','Bckg','bla','True',Area = [200,400],test = self,Live = bool(self.Live_BckgSub.get()))
+#        os.system('python ' + Pipe_Path + '/SP_BckgSub.py ' + " ".join(self.files_bckgsub))
         self.now = datetime.datetime.now()
         module_logger_Bckgsub.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
         
