@@ -779,7 +779,7 @@ class simpleapp_tk(Tk):
 
 
         for idx,elem in enumerate(self.Spec_List):
-            self.Spec_List[elem] = IntVar()
+            self.Spec_List[elem] = IntVar(value=1)
             self.Check_Select_Spec = Checkbutton(self.tab_Combine, text="Spectrum " + str(idx+1), variable=self.Spec_List[elem],command=self.Plot_Spectra).grid(column = 2,row=idx)
 
         print(self.Spec_List)
