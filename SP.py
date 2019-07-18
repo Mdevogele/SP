@@ -23,6 +23,7 @@ import operator
 
 import SP_BckgSub
 import SP_Extract
+import SP_Combine
 
 from PIL import Image
 from PIL import ImageTk
@@ -36,6 +37,10 @@ from scipy.ndimage import interpolation as interp
 from scipy import misc
 
 from scipy.optimize import curve_fit
+
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+import matplotlib.backends.tkagg as tkagg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 
 import time
 from datetime import date
@@ -77,6 +82,9 @@ class simpleapp_tk(Tk):
         self.frame_fits=Frame(self, width=1000, height=200)
         self.frame_fits.grid(column=0, row=1)
         
+        self.frame_tb = Frame(self,width = 400,heigh = 50)        
+        self.frame_tb.grid(column=0, row=2)
+         
         self.TabControl = ttk.Notebook(self.frame_process)
         self.tab1 = Frame(self.TabControl)
         self.TabControl.add(self.tab1,text='Analysis')
@@ -103,7 +111,8 @@ class simpleapp_tk(Tk):
         self.TabControl.add(self.tab_Extract,text='Spectra extraction')        
 
         self.tab_Combine = Frame(self.TabControl)
-        self.TabControl.add(self.tab_Combine,text='Combine spectra')  
+        self.TabControl.add(self.tab_Combine,text='Combine spectra')
+        self.TabControl.bind(self.tab_Combine,"<ButtonRelease-1>", self.load_file)    
 
         self.tab_WavCal = Frame(self.TabControl)
         self.TabControl.add(self.tab_WavCal,text='Wavelength calibration')   
@@ -123,9 +132,10 @@ class simpleapp_tk(Tk):
         self.canvas.pack()
         self.image = self.canvas.create_image(0, 0, anchor='nw',
                                               image=self.tkimage)  
-
-        im = Image.fromarray(Manos_img)
-        self.tkimage.paste(im)
+        
+        self.images = []
+        self.images.append(Image.fromarray(Manos_img))
+        self.tkimage.paste(self.images[0])
 
 
         self.LF_button = Button(self.tab1, text="Load files", width=10)
@@ -152,6 +162,13 @@ class simpleapp_tk(Tk):
         scrollb = Scrollbar(self.frame, command=self.frame.mytext2.yview)
         scrollb.grid(row=0, column=1, sticky='nsew')
         self.frame.mytext2['yscrollcommand'] = scrollb.set
+        
+        
+        # Initialization of some needed variables
+        
+        self.files_Combine = []
+        
+        
 #
 #        # Running the pipeline:
 #          
@@ -165,6 +182,55 @@ class simpleapp_tk(Tk):
         self.Combine_GUI()
         self.WavCal_GUI()
         self.TellCorr_GUI()
+
+        self.fig = plt.figure()
+        self.ax = self.fig.add_axes([0, 0, 1, 1])
+        self.lastindex = []
+
+        self.TabControl.bind("<<NotebookTabChanged>>", self.handle_tab_changed)
+
+    def handle_tab_changed(self,event):
+
+        selection = event.widget.select()
+        tab = event.widget.index("current")
+        
+        if self.lastindex != self.TabControl.index(self.tab_Combine):
+            print(self.lastindex)
+            self.canvas.delete("all")
+            self.canvas.forget()  
+            
+            if tab == self.TabControl.index(self.tab_Combine):
+                self.canvas = FigureCanvasTkAgg(self.fig, self.frame_fits)
+                self.canvas.show()
+                self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1) 
+            else: 
+#                self.canvas.get_tk_widget().destroy()         
+                self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+                self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+                             self.tkimage.width())
+                self.canvas.pack()
+                self.image = self.canvas.create_image(0, 0, anchor='nw',
+                                              image=self.tkimage)  
+        else: 
+            self.canvas.get_tk_widget().destroy()         
+            if tab == self.TabControl.index(self.tab_Combine):
+                self.canvas = FigureCanvasTkAgg(self.fig, self.frame_fits)
+                self.canvas.show()
+                self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1) 
+            else: 
+#                self.canvas.get_tk_widget().destroy()         
+                self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+                self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+                             self.tkimage.width())
+                self.canvas.pack()
+                self.image = self.canvas.create_image(0, 0, anchor='nw',
+                                              image=self.tkimage)  
+
+
+
+
+        self.lastindex = event.widget.index("current")       
+
 
     def Prepare_GUI(self):
         
@@ -351,6 +417,10 @@ class simpleapp_tk(Tk):
         self.FWHM.grid(row=3, column=1) 
         self.FWHM.insert(END,'6')
 
+        self.Live_Extract = IntVar()
+        self.Check_Live_Extract = Checkbutton(self.tab_Extract, text="Live processing", variable=self.Live_Extract).grid(column = 0,row=4)
+
+
 
 
     def Combine_GUI(self):
@@ -362,6 +432,11 @@ class simpleapp_tk(Tk):
         self.Combine_run_button = Button(self.tab_Combine, text="Combine spectra", width=20)
         self.Combine_run_button.grid(row=1, column=0, sticky=W)  
         self.Combine_run_button.bind("<ButtonRelease-1>", self.Combine)   
+
+
+#        self.Combine_plot_button = Button(self.tab_Combine, text="Combine spectra", width=20)
+#        self.Combine_plot_button.grid(row=2, column=0, sticky=W)  
+#        self.Combine_plot_button.bind("<ButtonRelease-1>", self.Combine)  
        
         self.frame_Combine=Frame(self.tab_Combine, width=1000, height=400)
         self.frame_Combine.grid(column=2, row=0,rowspan=25,columnspan=10)
@@ -374,10 +449,21 @@ class simpleapp_tk(Tk):
         self.frame_Combine.mytext_Extract = Text(self.frame_Combine, state="disabled")
         self.frame_Combine.mytext_Extract.place(x=10, y=10, height=990, width=390)  
 
+
+        self.menu_Combine = StringVar(self.tab_Combine)
+        self.menu_Combine.set("Median") # default value
+#
+        self.w = OptionMenu(self.tab_Combine, self.menu_Combine, "Median", "Mean")
+        self.w.bind("<ButtonRelease-1>", self.Update_Spectra)
+        self.w.grid(column=0, row=3, sticky=W)
+
         Label(self.tab_Combine, text='Combine spectrum name:').grid(row=2,column = 0)
         self.CombineName = Entry(self.tab_Combine) 
         self.CombineName.grid(row=2, column=1) 
         self.CombineName.insert(END,'OutSpectrum.spec')
+
+
+
 
 
     def WavCal_GUI(self):
@@ -535,7 +621,8 @@ class simpleapp_tk(Tk):
         for elem in self.fname:
             module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
             self.files_WavCal.append(elem)
-        
+
+
         self.read_all_fits(self.files_WavCal)
         print(self.images[0])
         
@@ -550,16 +637,19 @@ class simpleapp_tk(Tk):
         self.canvas.pack()
         self.image = self.canvas.create_image(0, 0, anchor='nw',
                                               image=self.tkimage)  
+        
+              # select first image
 
-                # events
+        self.index = 0        
+        im = self.images[self.index]
+        self.tkimage.paste(im)
+        
+        # events
         self.canvas.focus_set()
         self.canvas.bind("<Key>", self.key)
         self.canvas.bind("<Button 1>", self.left_click)
-        self.canvas.bind("<Button 2>", self.right_click)        
-              # select first image
-        
-        im = self.images[0]
-        self.tkimage.paste(im)
+        self.canvas.bind("<Button 2>", self.right_click)           
+
             
         return None
 
@@ -613,40 +703,97 @@ class simpleapp_tk(Tk):
 ##############################################################################
 
 
+    def Update_Spectra(self, event):
+        print('bla')
+        if self.files_Combine:
+
+            Method = self.menu_Combine.get()
+            
+            if Method == 'Median':
+                self.Combined = np.nanmedian(self.spec,axis=0)
+            if Method == 'Mean':
+                self.Combined = np.nanmean(self.spec,axis=0)
+                
+            self.ax.plot(self.Combined[0])
+            self.canvas.draw()
+            
+            
+            
+
+
+    def Plot_Spectra(self):        
+        if self.files_Combine:
+            self.spec = []
+            self.FileToCombine = []
+#            plt.figure()
+            for elem,elem2 in zip(self.files_Combine,self.fname):
+                if self.Spec_List[elem2].get():
+                    self.spec.append(np.loadtxt(elem).transpose())
+                    self.FileToCombine.append(elem2)
+            
+            Method = self.menu_Combine.get()
+            
+            self.spec = np.array(self.spec)
+            if Method == 'Median':
+                self.Combined = np.nanmedian(self.spec,axis=0)
+            if Method == 'Mean':
+                self.Combined = np.nanmean(self.spec,axis=0)
+            self.ax.remove()
+            self.ax = self.fig.add_axes([0, 0, 1, 1])
+            for elem in self.spec:
+#                if self.Spec_List[elem2].get():
+#                    print(elem2)
+                    self.ax.plot(elem[0,:],'.')
+            
+            self.ax.plot(self.Combined[0])
+            print(self.Combined)
+            
+            self.ax.set_ylim([np.nanmedian(self.Combined[0])-2*np.std(self.Combined[0]),np.nanmedian(self.Combined[0])+1*np.std(self.Combined[0])])
+            
+#            self.canvas = FigureCanvasTkAgg(fig, self.frame_fits)
+#            self.canvas.show()
+#            self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1) 
+    
+            toolbar = NavigationToolbar2TkAgg(self.canvas, self.frame_tb)
+            toolbar.update()
+            self.canvas._tkcanvas.pack(side=TOP, fill=BOTH, expand=1)
+
+            self.canvas.draw()
+
+
+
     def load_file_Combine(self, event):
+        
+#        self.fig = plt.figure()
         self.fname = askopenfilenames()
         self.now = datetime.datetime.now()
         self.files_Combine=[]
+        self.Spec_List = {}
         for elem in self.fname:
             module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1] )
             self.files_Combine.append(elem)
-        
-#        self.read_all_fits(self.files_Extract)
-#        print(self.images[0])
-        
+            self.Spec_List[elem] = 0  #Dictionarry for the check boxes 
+        print(self.Spec_List[self.fname[0]])
 #        self.canvas.delete("all")
-##        self.tkimage.forget()
 #        self.canvas.forget()
-#        
-#        
-#        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
-#        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
-#                             self.tkimage.width())
-#        self.canvas.pack()
-#        self.image = self.canvas.create_image(0, 0, anchor='nw',
-#                                              image=self.tkimage)  
-#        
-#              # select first image
-#        
-#        im = self.images[0]
-#        self.tkimage.paste(im)
-            
+
+
+        for idx,elem in enumerate(self.Spec_List):
+            self.Spec_List[elem] = IntVar()
+            self.Check_Select_Spec = Checkbutton(self.tab_Combine, text="Spectrum " + str(idx+1), variable=self.Spec_List[elem],command=self.Plot_Spectra).grid(column = 2,row=idx)
+
+        print(self.Spec_List)
+
+        self.Plot_Spectra()
         return None
+
+
 
     def Combine(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        os.system('python ' + Pipe_Path + '/SP_Combine.py ' + " ".join(self.files_Combine) + ' -o ' + os.path.split(self.files_Combine[0])[0] + '/' + self.CombineName.get())
+        SP_Combine.Combine_Spectra(self.FileToCombine,os.path.split(self.files_Combine[0])[0] + '/' + self.CombineName.get(),False)
+#        os.system('python ' + Pipe_Path + '/SP_Combine.py ' + " ".join(self.files_Combine) + ' -o ' + os.path.split(self.files_Combine[0])[0] + '/' + self.CombineName.get())
         self.now = datetime.datetime.now()
         module_logger_Extract.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Spectra combined' )
         
@@ -682,12 +829,12 @@ class simpleapp_tk(Tk):
         self.image = self.canvas.create_image(0, 0, anchor='nw',
                                               image=self.tkimage)  
         
-              # select first image
+#               select first image
         
         self.index = 0
         im = self.images[self.index]
         self.tkimage.paste(im)
-       
+        
         
         # events
         self.canvas.focus_set()
@@ -702,7 +849,10 @@ class simpleapp_tk(Tk):
     def Extract(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        SP_Extract.Extract_Spectrum(self.files_Extract,False,'bla',False,int(self.FWHM.get()))
+        
+        print(self.Live_Extract.get())
+        print(bool(self.Live_Extract.get()))
+        SP_Extract.Extract_Spectrum(self.files_Extract,False,'bla',False,int(self.FWHM.get()),self.Yloc,Live = self,Live2 = bool(self.Live_Extract.get()))
 #        os.system('python ' + Pipe_Path + '/SP_Extract.py ' + " ".join(self.files_Extract))
         self.now = datetime.datetime.now()
         module_logger_Extract.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
@@ -789,9 +939,7 @@ class simpleapp_tk(Tk):
     def BckgSub(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        print(self.Live_BckgSub.get())
-        print(bool(self.Live_BckgSub.get()))
-        SP_BckgSub.BckgSub(self.files_bckgsub,True,'auto','Bckg','bla','True',Area = [200,400],test = self,Live = bool(self.Live_BckgSub.get()))
+        SP_BckgSub.BckgSub(self.files_bckgsub,True,'range','Bckg','bla','True',Area = [self.Yloc-100,self.Yloc+100],test = self,Live = bool(self.Live_BckgSub.get()))
 #        os.system('python ' + Pipe_Path + '/SP_BckgSub.py ' + " ".join(self.files_bckgsub))
         self.now = datetime.datetime.now()
         module_logger_Bckgsub.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
@@ -1157,6 +1305,8 @@ class simpleapp_tk(Tk):
         
         region = sum(Line>(coeff[0]+50))/2
         
+        self.Yloc = max_index+int(y)-box
+        print(self.Yloc)
         
         fig, ax = plt.subplots()
         plt.plot(Line,Label = 'Spectrum')

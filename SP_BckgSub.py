@@ -53,7 +53,9 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
                 Center = SP.Detect_Spectra(image,Bin =2,**DetecFlags)
                 (Center)
                 Area[0] = int(Center-70)
-                Area[1] = int(Center+70)                
+                Area[1] = int(Center+70)
+            if Method == 'range':
+                Center = (Area[1]-Area[0])/2                
             
             print(Area)
             

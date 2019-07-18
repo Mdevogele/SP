@@ -10,7 +10,7 @@ import _SP_conf
 
 
 def Combine_Spectra(filenames,OutFile,Verbose):
-
+    
     Spe = [] 
     for elem in filenames:
         try:         
@@ -22,6 +22,14 @@ def Combine_Spectra(filenames,OutFile,Verbose):
             return
 
     Spe = np.array(Spe)
+
+    Ref = Spe[:,0][0]
+
+#    Wavel = [Wav, Wav]
+#    Spectre = [SpecA, SpecSA]
+#    Err = [ErrA,ErrSA]
+    
+#        SpecN,ErrN, WavN = SP.Shift_Spec(Spectre,Err,Wavel,**DetecFlags)
 
     SpecT = np.array(Spe[:,0]).astype(float)
     SpecT[SpecT<=0] = np.nan

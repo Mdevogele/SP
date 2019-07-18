@@ -7,7 +7,6 @@
 import argparse, shlex
 
 import SP_Toolbox as SP
-import SP_Deveny_Toolbox as SP_Dev_Tool
 import numpy as np
 
 from SP_CheckInstrument import CheckInstrument
@@ -17,19 +16,28 @@ import SP_diagnostics as diag
 
 from astropy.io import fits
 
-import cosmic
+#import cosmic
+
+from astroscrappy import detect_cosmics
+
 
 
 def Cosmic(filename,Diagnostic):
     
     Out_Name = []
-    telescope, obsparam = CheckInstrument([filename[0]])
+#    telescope, obsparam = CheckInstrument([filename[0]])
     for idx, elem in enumerate(filename): 
         hdulist = fits.open(elem)
         data=hdulist[0].data
-        c = cosmic.cosmicsimage(data,satlevel=65000)
-        c.run(maxiter = 1)
-        hdulist[0].data = c.cleanarray
+#        c = cosmic.cosmicsimage(data,satlevel=65000)
+        
+        crmask, c = detect_cosmics(data, inmask=None, satlevel=65000)
+        
+        
+#        c.run(maxiter = 1)
+#        hdulist[0].data = c.cleanarray
+        hdulist[0].data = c
+
         Out_Name.append(elem.replace('.fits','').replace('_Procc','') + '_' + '_CosmCorr' + '.fits')
         hdulist.writeto(elem.replace('.fits','').replace('_Procc','') + '_' + '_CosmCorr' + '.fits')
         

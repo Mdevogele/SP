@@ -22,6 +22,8 @@ import numpy as np
 import operator
 from astropy.io import fits
 import sqlite3
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.interpolate import interp1d
@@ -1182,8 +1184,8 @@ def Shift_Spec(Spectre,Err,Wavel,**kw):
          
         diffY = np.nan_to_num(diffY)
         diffY[diffY==0] = 100
-        plt.figure()
-        plt.plot(diffY)
+#        plt.figure()
+#        plt.plot(diffY)
         min_index, min_value = min(enumerate(diffY), key=operator.itemgetter(1))
         Shift = diffX[min_index]
         print(Shift)
@@ -1213,8 +1215,8 @@ def Shift_Spec(Spectre,Err,Wavel,**kw):
          
         diffY = np.nan_to_num(diffY)
         diffY[diffY==0] = 100
-        plt.figure()
-        plt.plot(diffY)
+#        plt.figure()
+#        plt.plot(diffY)
         min_index, min_value = min(enumerate(diffY), key=operator.itemgetter(1))
         Shift = diffX[min_index]
         print(Shift)
@@ -1487,7 +1489,7 @@ def Lin_Interp(data_x,data_y,n_bin):
     
 
 
-def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
+def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
     
     
     
@@ -1537,6 +1539,7 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
 
         Trace[Start[0]] = float(coeffIn[4])
 
+        Live.redcircle = []
         p0 = coeffIn
         for i in range(Start[0],15,-1):
             if i > 20 :
@@ -1551,6 +1554,13 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
                 bkg[i] = coeff[0]
                 if coeff[4] < 500 and coeff[4] > 12:
                     p0 = coeff
+                
+                if Live2:
+                    
+                    Live.redcircle.append(Live.canvas.create_oval(i/2, coeff[4]/2, i/2,
+                                                    coeff[4]/2, outline='blue',
+                                                        width=5)) 
+                    Live.canvas.update()
 
         p0 = coeffIn
         for i in range(Start[0],2030,1):
@@ -1564,6 +1574,12 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
             Trace[i] = float(coeff[4])
             bkg[i] = coeff[0]
             p0 = coeff
+            
+            if Live2:
+                Live.redcircle.append(Live.canvas.create_oval(i/2, coeff[4]/2, i/2,
+                                                    coeff[4]/2, outline='blue',
+                                                        width=5)) 
+                Live.canvas.update()
 
     #    MASK[CHIP_GAP[1][0]:CHIP_GAP[1][1]] = False
         Xind = np.array(range(x_size))    
@@ -1572,12 +1588,12 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
         p = np.poly1d(Pol)
         Tr = p(range(x_size))
         
-        plt.figure()
+#        plt.figure()
     
-        plt.plot(Xind[MASK],Trace[MASK])
-        plt.plot(Xind[MASK],Tr[MASK])
-        plt.figure()
-        plt.plot(Xind[MASK],bkg[MASK])
+#        plt.plot(Xind[MASK],Trace[MASK])
+#        plt.plot(Xind[MASK],Tr[MASK])
+#        plt.figure()
+#        plt.plot(Xind[MASK],bkg[MASK])
 
         return Trace, bkg, MASK 
 
@@ -1639,12 +1655,12 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
         p = np.poly1d(Pol)
         Tr = p(range(x_size))
         
-        plt.figure()
+#        plt.figure()
     
-        plt.plot(Xind[MASK],Trace[MASK])
-        plt.plot(Xind[MASK],Tr[MASK])
-        plt.figure()
-        plt.plot(Xind[MASK],bkg[MASK])
+#        plt.plot(Xind[MASK],Trace[MASK])
+#        plt.plot(Xind[MASK],Tr[MASK])
+#        plt.figure()
+#        plt.plot(Xind[MASK],bkg[MASK])
 
         return Trace, bkg, MASK 
         
@@ -1787,12 +1803,12 @@ def Fit_Trace(data,Start,Range = 15, SClip = True, **kw):
                 p = np.poly1d(Pol)
                 Tr = p(range(1562))
             
-        plt.figure()
+#        plt.figure()
     
-        plt.plot(Xind[MASK],Trace[MASK])
+#        plt.plot(Xind[MASK],Trace[MASK])
         #plt.plot(Xind[MASK],Tr[MASK])
-        plt.figure()
-        plt.plot(Xind[MASK],bkg[MASK])
+#        plt.figure()
+#        plt.plot(Xind[MASK],bkg[MASK])
         
         return Trace, bkg, MASK
 
@@ -1830,9 +1846,9 @@ def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
             Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]- bkg[i]
             Spec.append(sum(Sec))
         
-        plt.figure()
-        Spec = np.array(Spec)
-        plt.plot(Spec[Mask])    
+#        plt.figure()
+#        Spec = np.array(Spec)
+#        plt.plot(Spec[Mask])    
         
         return Spec
             

@@ -21,7 +21,7 @@ import SP_diagnostics as diag
 from SP_CheckInstrument import CheckInstrument
 
 
-def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM): 
+def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM,Yloc,Live = 0,Live2 = False): 
     
     
     Out_Files = []
@@ -44,10 +44,13 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM):
                 DetecFlags = {'Instrument':'Soar'}  
 
             # Try to detect the spectrum to extract 
-            Center = SP.Detect_Spectra(data,Bin=2,**DetecFlags)
+            if Yloc == None:
+                Center = SP.Detect_Spectra(data,Bin=2,**DetecFlags)
+            else:
+                Center = Yloc
             Start = (1415,Center)
             
-            Trace, bkg, MASK1 = SP.Fit_Trace(data,Start,Range = 15, SClip = True,**DetecFlags)
+            Trace, bkg, MASK1 = SP.Fit_Trace(data,Start,Range = 15, SClip = True,Live = Live,Live2 = Live2, **DetecFlags)
 
             TR=[]
             for idx,elem2 in enumerate(Trace):
@@ -60,23 +63,23 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM):
             hdulist.writeto(elem.replace('.fits','') + 'Trace.fits',overwrite = True)
             Out_Files.append(elem.replace('.fits','') + 'Trace.fits')
 
-            SSpec = []
-            for FW in range(20):
-                Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=FW,Mask = MASK1,**DetecFlags)
-                SSpec.append(Spec1)
+#            SSpec = []
+#            for FW in range(20):
+#                Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=FW,Mask = MASK1,**DetecFlags)
+#                SSpec.append(Spec1)
                 
 #            max_index, max_value = max(enumerate(np.nanmedian(SSpec,axis=1)/np.nanstd(SSpec,axis=1)), key=operator.itemgetter(1))
             Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=Spec_FWHM,Mask = MASK1,**DetecFlags)
             
 #            Spec1 = SP.Extract_Spectrum(data,Trace,bkg,FWHM=50,Mask = MASK1,**DetecFlags)
             print(Bckg)
-            Err = np.sqrt(Spec1*2.1) + np.sqrt(Spec_FWHM*Bckg*2.1) + np.sqrt(4)
+            Err = np.sqrt(np.array(Spec1).astype(float)*2.1) + np.sqrt(Spec_FWHM*Bckg*2.1) + np.sqrt(4)
             Err = Err/2.1
             # Normalization of the spectrum 
             Median = np.abs(np.nanmedian(Spec1[1500:1600]))
             Spec1N = Spec1/Median
             Err= Err/Median
-            fname = elem.replace('.fits','.txt')
+            fname = elem.replace('_CosmCorr','').replace('Bckg','Extracted').replace('.fits','.txt')
             np.savetxt(fname, np.array([Spec1N,Err]).transpose())
 #            f = open(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt','w')
 #            Out_Spec.append(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt')
@@ -179,6 +182,11 @@ if __name__ == '__main__':
     parser.add_argument('-fwhm',
                         default = 5,
                         help='FWHM of the spectrum trace')
+    
+    parser.add_argument('-Yloc',
+                        default = None,
+                        help='Y location of the spectrum')
+    
 
     parser.add_argument('-d',
                         help='Enable or disable the diagnostic',
@@ -189,6 +197,7 @@ if __name__ == '__main__':
 
     Verbose = args.v
     Spec_loc = args.g
+    Yloc = args.Yloc
     filenames = args.images  
     fwhm = int(args.fwhm)
     Diagnostic = args.d
@@ -196,6 +205,6 @@ if __name__ == '__main__':
     print(filenames)
 
     
-    Extract_Spectrum(filenames,Verbose,Spec_loc,Diagnostic,fwhm)
+    Extract_Spectrum(filenames,Verbose,Spec_loc,Diagnostic,fwhm,Yloc,Live = 0,Live2 = False)
     pass
 
