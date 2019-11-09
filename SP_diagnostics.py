@@ -373,7 +373,7 @@ def add_BiasSummary(filenames,MasterBias,html_file, imagestretch='linear'):
     return None
 
 
-def add_FlatSummary(filenames,MasterFlat,html_fileimagestretch='linear'):
+def add_FlatSummary(filenames,MasterFlat,html_file,imagestretch='linear'):
     """
     add bias processing summary to website
     """
