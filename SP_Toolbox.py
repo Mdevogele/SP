@@ -109,12 +109,16 @@ def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Tresh_Arcs = [8, 20]):
         min_ind = max_index
         while value> max_value/Tresh_Det:
             min_ind -= 1
+            if abs(min_ind) >= len(Arcs):
+                break
             value = Arcs[min_ind]
     
         value = 999999
         max_ind = max_index
         while value> max_value/Tresh_Det:
             max_ind += 1
+            if abs(max_ind) >= len(Arcs):
+                break
             value = Arcs[max_ind]        
             
         Arcs_Size = (max_ind - min_ind)
