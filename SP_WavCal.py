@@ -76,8 +76,8 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
 
         Dim.append(np.size(Arcs,0))
         Dim.append(np.size(Arcs,1))
-    
-        Arcs_L = Arcs[Dim[0]/2,:] 
+		
+        Arcs_L = Arcs[int(Dim[0]/2),:] 
         Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.5, Tresh_Arcs = [4, 10] )
         
         f = open(Pipe_Path + '/Wav_Precomp','r')
