@@ -43,7 +43,7 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
             Gratting = hdulist[0].header[obsparam['grating']]
             Binning = hdulist[1].header['CCDSUM'][0]
             DetecFlags = {'Instrument':telescope, 'Binning' : Binning, 'Gratting':Gratting, 'Detector':Detector}  
-            print DetecFlags
+            print(DetecFlags)
         if telescope == 'DEVENY':
             DetecFlags = {'Instrument':'Deveny'}  
         if telescope == 'SOAR':
