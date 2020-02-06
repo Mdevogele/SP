@@ -28,7 +28,7 @@ scipy <=1.2.0 as 1.3.0+ does not have toimage(). Python 3.5 seems to work.
 ## Run-through: DeVeny
 
 1. Renaming the data according to the FITS header: `SP_Prepare2.py *fits`
-[note: SP will automatically make a copy of the raw data, as it will rename/rewrite all the data.]
+  [note: SP will automatically make a copy of the raw data, as it will rename/rewrite all the data.]
 2. Print out a summary of all data: `SP_Log.py *fits`
 3. Creating master bias: `SP_Bias.py *BIAS* -o MasterBias.fits`
 4. Creating master flat: `SP_Flat.py *FLAT* -b MasterBias.fits -o MasterFlat.fits -m none`
