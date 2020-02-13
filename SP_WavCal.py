@@ -43,7 +43,7 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
             Gratting = hdulist[0].header[obsparam['grating']]
             Binning = hdulist[1].header['CCDSUM'][0]
             DetecFlags = {'Instrument':telescope, 'Binning' : Binning, 'Gratting':Gratting, 'Detector':Detector}  
-            print DetecFlags
+            print(DetecFlags)
         if telescope == 'DEVENY':
             DetecFlags = {'Instrument':'Deveny'}  
         if telescope == 'SOAR':
@@ -76,11 +76,11 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
 
         Dim.append(np.size(Arcs,0))
         Dim.append(np.size(Arcs,1))
-    
-        Arcs_L = Arcs[Dim[0]/2,:] 
+		
+        Arcs_L = Arcs[int(Dim[0]/2),:] 
         Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.5, Tresh_Arcs = [4, 10] )
         
-        f = open(Pipe_Path + '/Wav_Precomp','r')
+        f = open(Pipe_Path + '/Wav_Precomp','rb')
         Pre = pickle.load(f)
         f.close()
         

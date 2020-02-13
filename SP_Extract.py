@@ -81,11 +81,11 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM,Yloc,Live = 
             Err= Err/Median
             fname = elem.replace('_CosmCorr','').replace('Bckg','Extracted').replace('.fits','.txt')
             np.savetxt(fname, np.array([Spec1N,Err]).transpose())
-#            f = open(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt','w')
-#            Out_Spec.append(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt')
-#            for item in Spec1N:
-#                f.write("%s\n" % item)
-#            f.close()
+            f = open(elem.replace('.fits','').replace('_Bckg','') + '.txt','w')
+            Out_Spec.append(elem.replace('.fits','').replace('_Bckg','') + '.txt')
+            for item in Spec1N:
+                f.write("%s\n" % item)
+            f.close()
     if telescope == 'GMOSS' or telescope == 'GMOSN':
         OffFile = Spec_loc + '_Offset.txt'
         with open(OffFile,'r') as f:
@@ -149,16 +149,17 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM,Yloc,Live = 
             if Binning == '4':
                 Spec1N = Spec1/np.abs(np.nanmedian(Spec1[800:850]))
 
-            f = open(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt','w')
-            Out_Spec.append(elem.replace('.fits','').replace('_bkgSub','').replace('_Procc','') + '.txt')
+            f = open(elem.replace('.fits','').replace('_Bckg','') + '.txt','w')
+            Out_Spec.append(elem.replace('.fits','').replace('_Bckg','') + '.txt')
 
             for item in Spec1N:
                 f.write("%s\n" % item)
             
             f.close()
-
+    
     if Diagnostic: 
         diag.create_website('Extract_Log.html')
+        print(elem, Out_Files, Out_Spec, telescope)
         diag.add_Extract(Out_Files,Out_Spec,'Extract_Log.html')
             
         

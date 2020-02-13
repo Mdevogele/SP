@@ -12,6 +12,7 @@ import numpy as np
 from astropy.io import fits
 
 from itertools import groupby
+
 from operator import itemgetter
 
 import SP_diagnostics as diag
@@ -41,7 +42,7 @@ def Create_Flat(filenames,MasterName,Verbose,Bias,Series,Diagnostic):
         List_Idx_Series = []
         for k, g in groupby(enumerate(index), lambda x: x[1]-x[0]):
             File_Idx_Series.append(map(itemgetter(1), g))
-        for k, g in itertools.groupby(enumerate(index), lambda x: x[1]-x[0]):
+        for k, g in groupby(enumerate(index), lambda x: x[1]-x[0]):
             List_Idx_Series.append(map(itemgetter(0), g))  
     
         
@@ -73,7 +74,7 @@ def Create_Flat(filenames,MasterName,Verbose,Bias,Series,Diagnostic):
 
         if Diagnostic:
             diag.create_website('Flat_Log.html')
-            diag.add_BiasSummary(filenames,FlatName,'Flat_Log.html')
+            diag.add_FlatSummary(filenames,FlatName,'Flat_Log.html')
             diag.add_FlatList(filenames,'Flat_Log.html')
 
         if Verbose:
