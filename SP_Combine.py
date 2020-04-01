@@ -10,6 +10,11 @@ import _SP_conf
 
 
 def Combine_Spectra(filenames,OutFile,Verbose):
+#
+#    logging.info('****************************************')
+#    logging.info('****** Start of SP_Combine script ******')
+#    logging.info('****************************************')
+
     
     Spe = [] 
     for elem in filenames:
@@ -32,26 +37,34 @@ def Combine_Spectra(filenames,OutFile,Verbose):
 #        SpecN,ErrN, WavN = SP.Shift_Spec(Spectre,Err,Wavel,**DetecFlags)
 
     SpecT = np.array(Spe[:,0]).astype(float)
+#    SpecT = np.array(Spe).astype(float)
+
     SpecT[SpecT<=0] = np.nan
     SpecT[SpecT>10] = np.nan
     Err = np.array(Spe[:,1])
     Error = []
     for idx,elem in enumerate(SpecT):
-        Med  = np.nanmedian(SpecT[idx][1300:1500])
+        Med  = np.nanmedian(SpecT[idx][1100:1600])
         SpecT[idx] = SpecT[idx]/Med
         Err[idx] = Err[idx]/Med
     SpecTT = np.nanmedian(SpecT,axis=0)
     Error = np.sqrt(np.sum(Err**2,axis=0))/(np.size(Err,axis=0))
-    print(Error)
+#    print(Error)
     print(OutFile)
-    np.savetxt(OutFile,np.array([SpecTT,Error]).transpose())
     
+#    np.array([SpecTT,Error]
+    np.savetxt(OutFile,np.array([SpecTT,Error]).transpose())
+#    np.savetxt(OutFile,np.array([SpecTT]).transpose())
+
 #    f = open(OutFile,'w')
 #    for item in SpecTT:
 #      f.write("%s\n" % item)
 #    f.close()
     
-    
+#    logging.info('**************************************')
+#    logging.info('****** End of SP_Combine script ******')
+#    logging.info('**************************************')
+#    
     
 if __name__ == '__main__':
     

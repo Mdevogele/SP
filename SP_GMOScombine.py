@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import math
 
 
-def GMOScombine(filenames,Date,Target):
+def GMOScombine(filenames,Date,Target,Facility):
     
     if Target == False:
         Target = filenames[0].split('_')[0]
@@ -97,17 +97,17 @@ def GMOScombine(filenames,Date,Target):
 #        SpecTT[-1] = SpecTT[-25]
     
 
-    Date = '1704012'
+#    Date = '1704012'
     
     Tax = SP.Get_Taxonomy(Wave,SpecTT)
-    f = open(Target + '_' + Date + '_' + 'GMOS' + '_Tax.dat','w')
+    f = open(Target + '_' + Date + '_' + Facility + '_Tax.dat','w')
     for ele in Tax:
         f.write(ele[0] + ',' + str(ele[1]) + '\n')
     f.close()
     plt.figure()
-    SP.Plot_Taxonomy(Wave,SpecTT,Target,Date,'GMOS')
+    SP.Plot_Taxonomy(Wave,SpecTT,Target,Date,Facility)
      #       plt.savefig('spec.jpg',dpi=1200)
-    plt.savefig(Target + '_' + Date + '_' + 'GMOS' + '_spec.jpg',dpi=1200)
+    plt.savefig(Target + '_' + Date + '_' + Facility + '_spec.jpg',dpi=1200)
         
     f = open(Target + '.spec','w')
     for wavel, refl in zip(Wave,SpecTT):
@@ -149,6 +149,10 @@ if __name__ == '__main__':
 
     parser.add_argument('-d', help='',
                         default = '20171019')
+    
+    parser.add_argument('-f', help='',
+                        default = 'Gemini')
+    
     parser.add_argument('-t',
                         help='Target name',
                         default = False)
@@ -156,6 +160,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     Date = args.d
     Target = args.t
+    Facility = args.f
 #    Method = args.m
 #    Series = args.s
 #    MasterBias = args.b
@@ -166,6 +171,6 @@ if __name__ == '__main__':
     
     
     # call run_the_pipeline only on filenames
-    GMOScombine(filenames,Date,Target)
+    GMOScombine(filenames,Date,Target,Facility)
     pass
     

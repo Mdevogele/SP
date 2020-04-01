@@ -10,10 +10,17 @@ import math
 import argparse, shlex
 import numpy as np
 
+import logging
+
 from SP_CheckInstrument import CheckInstrument
 
 def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
 
+    logging.info('*****************************************')
+    logging.info('****** Start of SP_TellCorr script ******')
+    logging.info('*****************************************')
+    
+    
     DetecFlags = {'Instrument':Instrument}  
 
     for idx,elem in enumerate(filenames):
@@ -82,7 +89,7 @@ def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
                 f.write(ele[0] + ',' + str(ele[1]) + '\n')
             f.close()
             plt.figure()
-            SP.Plot_Taxonomy(WavNew[10:-10],Spec[10:-10],Target,'170514','DCT')
+            SP.Plot_Taxonomy(WavNew[10:-10],Spec[10:-10],Target,Date,'DCT')
      #       plt.savefig('spec.jpg',dpi=1200)
             plt.savefig(Target + '_' + Date + '_' + 'DCT' + '_spec.jpg',dpi=1200)
         
@@ -100,6 +107,11 @@ def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
                 if not math.isnan(refl):
                     f.write(str(wavel)+ '\t' + str(refl) + '\n')
             
+
+    logging.info('***************************************')
+    logging.info('****** End of SP_TellCorr script ******')
+    logging.info('***************************************')
+
         
 
 

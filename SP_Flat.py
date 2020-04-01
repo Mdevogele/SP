@@ -52,8 +52,12 @@ def Create_Flat(filenames,MasterName,Verbose,Bias,Series,Diagnostic):
 
     for idx, elem in enumerate(List_Idx_Series):
         
-        FlatName = MasterName.replace('.fits','_' + str(idx + 1)) + '.fits'
+        if len(List_Idx_Series) > 1:
+            FlatName = MasterName.replace('.fits','_' + str(idx + 1)) + '.fits'
+        else:
+            FlatName = MasterName
         
+        print(FlatName)
         if Verbose:
             print('Creating the master flat {}'.format(FlatName))  
 
@@ -66,8 +70,7 @@ def Create_Flat(filenames,MasterName,Verbose,Bias,Series,Diagnostic):
         FileList = []
         for filesidx in elem:
             FileList.append(filenames[filesidx])
-            
-            
+        
             
         SP.Create_Flat(FileList,**FlatFlags)
 

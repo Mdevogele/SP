@@ -22,9 +22,12 @@ import _SP_conf
 from SP_CheckInstrument import CheckInstrument
 
 
-def Prepare(filenames,Verbose):
+def Prepare(filenames,Verbose=True):
     
-    
+    logging.info('****************************************')
+    logging.info('****** Start of SP_Prepare script ******')
+    logging.info('****************************************')
+
     # Get current directory 
     
     Directory = os.getcwd()
@@ -35,8 +38,7 @@ def Prepare(filenames,Verbose):
         filenames[idx] = filename.replace('./','')
     
     # start logging
-    logging.info('Preparing data with parameters: %s',filenames)
-    print('Preparing data with parameters: %s',filenames)
+#    logging.info('Preparing data with parameters: %s',filenames)
 
     # Create the procc folder 
 
@@ -53,6 +55,7 @@ def Prepare(filenames,Verbose):
         os.makedirs('raw')
         for idx, filename in enumerate(filenames):
             shutil.copy(filename, './' + 'raw/' + filename)
+            logging.info('All data have been backup to the ./raw directory')
 
 
     telescope, obsparam = CheckInstrument(filenames)
@@ -65,26 +68,20 @@ def Prepare(filenames,Verbose):
             filenames[idx] = '.'.join(filename.split('.')[:-1])+'.fits'
             logging.info('change filename from "%s" to "%s"' %
                          (filename, filenames[idx]))
-        if telescope == 'SOAR':
-            hdulist = fits.open(filename)
-            hdulist[0].data = hdulist[0].data[200:-200,:]
-            hdulist.writeto(filename,overwrite = True,checksum=False, output_verify='ignore')
+#        if telescope == 'SOAR':
+#            hdulist = fits.open(filename)
+#            hdulist[0].data = hdulist[0].data[200:-200,:]
+#            hdulist.writeto(filename,overwrite = True,checksum=False, output_verify='ignore')
 
 
-    # identify keywords for GENERIC telescopes
 
-    # open one sample image file
-    hdulist = fits.open(filenames[0], verify='ignore',
-                        ignore_missing_end='True')
-    header = hdulist[0].header
     
-    # keywords that have to be implanted into each image
-    implants = {}
-    
-    # prepare image headers for spectroscopic pipeline
-    
-    
-    CheckObsType(filenames)
+    CheckObsType(filenames,telescope,obsparam)
+
+
+    logging.info('**************************************')
+    logging.info('****** end of SP_Prepare script ******')
+    logging.info('**************************************')
 
 
     return None   

@@ -17,7 +17,12 @@ import _SP_conf
 from SP_CheckInstrument import CheckInstrument
 
 
-def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
+def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
+    
+#    logging.info('***************************************')
+#    logging.info('****** Start of SP_Wavcal script ******')
+#    logging.info('***************************************')    
+    
     
     Pipe_Path = _SP_conf.rootpath
     Arcs = []
@@ -48,6 +53,12 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
             DetecFlags = {'Instrument':'Deveny'}  
         if telescope == 'SOAR':
             DetecFlags = {'Instrument':'Soar'}      
+        if telescope == 'NOT':
+            Wav = ((10.93/2)*np.array(range(np.shape(Arcs)[1]))+3609.8)/10000
+            print(np.shape(Arcs)[1])
+            np.savetxt(OutFile,np.array([Wav,SpecA[0,:],SpecA[1,:]]).transpose())
+
+            return None
     
            
         print(DetecFlags)
@@ -77,12 +88,21 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
         Dim.append(np.size(Arcs,0))
         Dim.append(np.size(Arcs,1))
     
-        Arcs_L = Arcs[Dim[0]/2,:] 
-        Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.5, Tresh_Arcs = [4, 10] )
+        Arcs_L = Arcs[Line,:] 
+        Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.35, Tresh_Arcs = [2, 12] )
         
-        f = open(Pipe_Path + '/Wav_Precomp','r')
-        Pre = pickle.load(f)
-        f.close()
+        
+        if telescope == 'DEVENY':
+            f = open(Pipe_Path +'/Pre_Comp_Deveny')
+            Pre = pickle.load(f)
+            f.close()
+            WV = [7503.9,7635.1,7723.8,7948.2,8014.8,8115.3,8264.5,8424.6,8521.4,9122.9,9224.5,9657.8]
+#            WV = [3261.05, 3610.51, 3650.15, 4046.56, 4358.33, 4678.16, 4799.92, 5085.82, 5460.74, 5769.6, 5790.7, 6965.5, 7067.2, 7272.9, 7384.0]
+        else:
+            f = open(Pipe_Path + '/Wav_Precomp','r')
+            Pre = pickle.load(f)
+            f.close()
+            WV = [7067.2,7147.0, 7272.9, 7384.0 ,7503.9, 7635.1, 7723.8, 7948.2, 8014.8, 8115.3, 8264.5, 8408.2, 8521.4, 8667.9, 9122.9, 9224.5,9354.2,9657.8, 9784.5] 
         
         One = Arcs_Loc[:9]
         One = np.array(One).astype(float)
@@ -104,7 +124,7 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
         AS = np.argsort(dist)
         max_index, max_value = min(enumerate(dist), key=operator.itemgetter(1))
 
-        WV = [6965.4,7067.2,7147.0, 7272.9, 7384.0 ,7503.9, 7635.1, 7723.8, 7948.2, 8014.8, 8115.3, 8264.5, 8408.2, 8521.4, 8667.9, 9122.9, 9224.5,9354.2,9657.8, 9784.5] 
+#        WV = [7067.2,7147.0, 7272.9, 7384.0 ,7503.9, 7635.1, 7723.8, 7948.2, 8014.8, 8115.3, 8264.5, 8408.2, 8521.4, 8667.9, 9122.9, 9224.5,9354.2,9657.8, 9784.5] 
 
         comb = combinations(WV, 9)
 
@@ -116,30 +136,41 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method):
 
         a,b = np.polyfit(WV_Comb[AS[0]],np.sort(One)[::-1],1)
 
-        Red = a*np.array(WV)+b
-        WV_Sol = []
-        for elem in Arcs_Loc: 
-            Dist = (Red-elem)**2
-            SD = np.argsort(Dist)
-            WV_Sol.append(WV[SD[0]])
-
-        aa= np.polyfit(WV_Sol,Arcs_Loc,1,full=True)
-        
-        print(aa[1])
+#        Red = a*np.array(WV)+b
+#        WV_Sol = []
+#        for elem in Arcs_Loc[:9]: 
+#            Dist = (Red-elem)**2
+#            SD = np.argsort(Dist)
+#            WV_Sol.append(WV[SD[0]])
+#
+#        aa= np.polyfit(WV_Sol,Arcs_Loc[:9],1,full=True)
+#        
+#        print(aa[1])
 
         with open(filenames[0],'r') as f:
             SpecA = f.read().splitlines()  
         
         SpecA = np.flip(SpecA,axis=0)
-        
-        Wav = (np.array(range(0,len(SpecA))) - aa[0][1])/aa[0][0]
+
+        print('bla')
+        Wav = (np.array(range(0,len(SpecA))) - b)/a
         Wav = Wav/10000
         Wavel = Wav[::-1]
+        
+#        Wav = (np.array(range(0,len(SpecA))) - aa[0][1])/aa[0][0]
+#        Wav = Wav/10000
+#        Wavel = Wav[::-1]
         
         f = open(OutFile,'w')
         for Wave,Spec in zip(Wavel,SpecA):
           f.write("{} \t {} \n".format(Wave,Spec))
         
+        
+#        
+#    logging.info('*************************************')
+#    logging.info('****** End of SP_Wavcal script ******')
+#    logging.info('*************************************')
+#        
         
     return None
 
@@ -154,6 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('-v',
                         help='Increase verbosity',
                         action="store_true")    
+    
     parser.add_argument('-o',
                         help='Name of the combined spectrum',
                         default = 'SpecOut.spec')   
@@ -161,6 +193,16 @@ if __name__ == '__main__':
     parser.add_argument('-m',
                         help='Method to use for calibration: auto or template',
                         default = 'auto')   
+    
+    parser.add_argument('-l',
+                        help='Line to use for wavelength calibration',
+                        default = 250)
+
+    parser.add_argument('-f',
+                        help='Do full frame wavelength calibration',
+                        action="store_true",
+                        default = False)      
+    
     
     parser.add_argument('images', help='images to process or \'all\'',
                         nargs='+')
@@ -170,11 +212,14 @@ if __name__ == '__main__':
     Verbose = args.v
     OutFile = args.o
     Method = args.m
-    filenames = args.images  
+    filenames = args.images
+    full = args.f
+    
+    Line = int(args.l)
     
     print(ArcsFile)
     print(OutFile)
 
     
-    WavCal(filenames,ArcsFile,OutFile,Verbose,Method)
+    WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,full)
     pass

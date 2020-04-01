@@ -13,11 +13,14 @@ Spectroscopy pipeline:
 #! /usr/bin/env python
 
 #import sys
+from __future__ import print_function
+
 
 import fileSelect as fs
 import os, sys
 import copy
 
+import re
 import numpy as np
 import operator
 from astropy.io import fits
@@ -42,7 +45,12 @@ from matplotlib.cbook import get_sample_data
 
 from scipy.interpolate import UnivariateSpline
 from astropy.convolution import convolve, Box1DKernel
+from astropy.time import Time
 
+
+from scipy.ndimage.interpolation import shift, rotate
+from ccdproc import transform_image
+from astropy.nddata import CCDData
 
 from astropy.coordinates import ICRS, Galactic, FK4, FK5
 from astroquery.simbad import Simbad
@@ -93,6 +101,78 @@ def Check(filename):
     if len(filename) == 0:
         raise IOError('cannot find any data...')
 
+
+
+def Fit_Arc_Line(data,Start_X,Start_Y,Range = 20):
+    
+    X_loc = []
+    Y_loc = []
+    
+    Dim_Y = np.size(data,axis=0)
+    S_X = Start_X
+    S_Y = Start_Y
+    for elem in range(Start_Y,0,-1):
+        Y_loc.append(elem)
+        Sub_Arcs = data[elem,Start_X-Range:Start_X+Range]
+        max_index, max_value = max(enumerate(Sub_Arcs), key=operator.itemgetter(1))
+        # Search for the size of the arc lines 
+            
+        value = 999999
+        min_ind = max_index
+        while value> max_value/Tresh_Det:
+            min_ind -= 1
+            value = Sub_Arcs[min_ind]
+        
+        value = 999999
+        max_ind = max_index
+        while value> max_value/Tresh_Det:
+            max_ind += 1
+            value = Sub_Arcs[max_ind]        
+                
+        Arcs_Size = (max_ind - min_ind)
+#        if Arcs_Size < Tresh_Arcs[1] and Arcs_Size > Tresh_Arcs[0] :
+        
+        Loc_Max = int(max_ind+min_ind)/2
+        X_loc.append(Start_X+int(max_ind+min_ind)/2-Range/2)
+        
+#        X_loc.append(Loc_Max)
+        Start_X = X_loc[-1]
+
+    Start_X = S_X
+    Start_Y = S_Y
+    for elem in range(Start_Y+1,Dim_Y):
+        Y_loc.append(elem)
+        Sub_Arcs = data[elem,Start_X-Range:Start_X+Range]
+        max_index, max_value = max(enumerate(Sub_Arcs), key=operator.itemgetter(1))
+        # Search for the size of the arc lines 
+            
+        value = 999999
+        min_ind = max_index
+        while value> max_value/Tresh_Det:
+            min_ind -= 1
+            value = Sub_Arcs[min_ind]
+        
+        value = 999999
+        max_ind = max_index
+        while value> max_value/Tresh_Det:
+            max_ind += 1
+            value = Sub_Arcs[max_ind]        
+                
+        Arcs_Size = (max_ind - min_ind)
+#        if Arcs_Size < Tresh_Arcs[1] and Arcs_Size > Tresh_Arcs[0] :
+        
+        Loc_Max = int(max_ind+min_ind)/2
+        X_loc.append(Start_X+int(max_ind+min_ind)/2-Range/2)
+        
+#        X_loc.append(Loc_Max)
+        Start_X = X_loc[-1]
+
+
+        
+    return(X_loc)
+    
+
+
 def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Tresh_Arcs = [8, 20]):
 
 
@@ -103,29 +183,32 @@ def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Tresh_Arcs = [8, 20]):
     plt.plot(Arcs)
     while np.median(Arcs) < max_value-5*np.std(Arcs):
         max_index, max_value = max(enumerate(Arcs), key=operator.itemgetter(1))
-        # Search for the size of the arc lines 
         
-        value = 999999
-        min_ind = max_index
-        while value> max_value/Tresh_Det:
-            min_ind -= 1
-            value = Arcs[min_ind]
-    
-        value = 999999
-        max_ind = max_index
-        while value> max_value/Tresh_Det:
-            max_ind += 1
-            value = Arcs[max_ind]        
+        if max_index>0:
+            # Search for the size of the arc lines 
             
-        Arcs_Size = (max_ind - min_ind)
-        if Arcs_Size < Tresh_Arcs[1] and Arcs_Size > Tresh_Arcs[0] :
-            print(Arcs_Size)
-            Arcs_loc.append(int(max_ind+min_ind)/2)
+            value = 999999
+            min_ind = max_index
+            while value> max_value/Tresh_Det and min_ind>0:
+#                print(min_ind)
+                min_ind -= 1
+                value = Arcs[min_ind]
         
-        if min_ind>4:
-            Arcs[min_ind-4:max_ind+4] = np.nanmedian(Arcs)
-        else:
-            Arcs[:max_ind+4] = np.nanmedian(Arcs)
+            value = 999999
+            max_ind = max_index
+            while value> max_value/Tresh_Det and max_ind<(len(Arcs)-1):
+                max_ind += 1
+                value = Arcs[max_ind]        
+                
+            Arcs_Size = (max_ind - min_ind)
+            if Arcs_Size < Tresh_Arcs[1] and Arcs_Size > Tresh_Arcs[0] :
+                print(Arcs_Size)
+                Arcs_loc.append(int(max_ind+min_ind)/2)
+            
+            if min_ind>4:
+                Arcs[min_ind-4:max_ind+4] = np.nanmedian(Arcs)
+            else:
+                Arcs[:max_ind+4] = np.nanmedian(Arcs)
     
     for elem in Arcs_loc:
         plt.plot([elem,elem],[0,60000])
@@ -313,7 +396,7 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
     # Generate the plot
     
     plt.plot(Wav,Spec,zorder=1)
-    plt.errorbar(Wave_out,Spec_out,yerr = Error,fmt='.k',markersize=12,zorder=3, label= SpecName + ' (Binned)')
+    plt.errorbar(Wave_out,Spec_out,yerr = Error,fmt='.k',markersize=12,zorder=3, label= SpecName.split('/')[-1] + ' (Binned)')
     plt.fill_between(Wv[0:Num_Tax], Data_Tax[min_index,0:Num_Tax] - Data_Err[min_index,0:Num_Tax], Data_Tax[min_index,0:Num_Tax] + Data_Err[min_index,0:Num_Tax],alpha=0.8,facecolor='grey',zorder=2, label= 'Taxonomy: ' + str(Taxonomy[0]))    
 
     plt.legend()
@@ -323,12 +406,17 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
 
     fig = plt.gcf()
     
+    if Facility == 'Gemini' or Facility == 'Gemini-S' or Facility == 'Gemini-N':
+        Instrument = 'GMOS'
+    else:
+        Instrument = 'DeVeny'
+        
 #    plt.title(Facility + ', ' + SpecName )
-    plt.title("Lowell's 4.3m DCT; DeVeny; 2019-05-28")
+    plt.title(Facility + '; ' + Instrument + '; ' + Date)
     plt.xlabel(r'Wavelength [micron]', fontsize=14)
     plt.ylabel(r'Normalized reflectance', fontsize=14)
-    plt.text(0.35,1.52, "Observers: B. Skiff, N. Moskovitz")
-    plt.text(0.35,1.47, "Reduction: M. Devogele")
+#    plt.text(0.35,1.52, "Observers: B. Skiff, N. Moskovitz")
+#    plt.text(0.35,1.47, "Reduction: M. Devogele")
 
 
     im = plt.imread(get_sample_data(Pipe_Path +'/manos_splash.eps'))
@@ -470,7 +558,10 @@ def Auto_Detect_Spectra(files, Sig, Auto = True):
     Binning = hdulist[1].header['CCDSUM']
     Bin = int(Binning[0])
     
-    image,XS,YS = Cut_Image(data, Bin = Bin)
+    if np.shape(data)[0] > 600:
+        image,XS,YS = Cut_Image(data, Bin = Bin)
+    else:
+        image = np.median(data,axis=1)
     
     Range = 30    
     image -= np.nanmedian(image)
@@ -600,15 +691,213 @@ def GMOS_open2(image):
     telescope, obsparam = CheckInstrument(image)
     hdulist = fits.open(image[0])
     
+    order = 0
     Bin = get_binning(hdulist[1].header,obsparam)
     
-    Data =[]
     DATASEC = []
     
+    print(hdulist[0].header['DETECTOR'])
+        
+    # Set instrument north or south
     
-    if hdulist[0].header['DETECTOR'] == 'GMOS + e2v DD CCD42-90':
-        print('bla')
+    hselect = hdulist[0].header['INSTRUME']
+    if "GMOS-S" in hselect:
+        inst = 1
+        print('The telescope is Gemini South')
+    else:
+        inst = 0    # assume GMOS-N
+        print('The telescope is Gemini North')
+
+    # Set ishamamatsu flag
+    imgets = hdulist[0].header['DETTYPE']
+    if imgets == "S10892" or imgets == "S10892-N":
+    # KL - check if GMOS-S values are valid for GMOS-N Hamamatsu
+        ishamamatsu = True
+        print('The detector is hamamatsu')
+    else:
+        ishamamatsu = False
+
+    # Set gapvalue
+    #if l_gap == "default":
+    if ishamamatsu:
+        if inst == 1: # GMOS-S
+            gapvalue = int(61/Bin[0]) #hcode ##M CHIP_GAP
+        else:  # GMOS-N
+            gapvalue = int(67/Bin[0])
+            
+    else:
+        gapvalue = int(37/Bin[0])
+
+    # Set the detector type here
+    # GMOS-N
+    if inst == 0: 
+        l_struct = hdulist[0].header['DETTYPE']
+        if l_struct == "SDSU II CCD": #Current EEV CCDs
+            iccd = 0
+        elif l_struct == "SDSU II e2v DD CCD42-90":
+            # New e2vDD CCDs
+            iccd = 1
+            print('The dectector is the new e2vDD CCD for gemini North')
+        elif l_struct == "S10892-N":  # Hamamatsu CCDs
+            iccd = 2
+    
+    elif inst == 1: # GMOS-S
+        l_struct = hdulist[0].header['DETTYPE']
+        if l_struct == "S10892":
+            # Hamamatsu CCDs
+            iccd = 2
+        else:
+            l_struct = hdulist[0].header['DETECTOR']
+            if l_struct == "GMOS + Blue1 + new CCD1":
+                iccd = 1 # GMOS-S blue CCD upgrades
+            else:
+                iccd = 0 # Original CCDs  
+                print('The detector is the original CCD')
+
+
+    if ishamamatsu:    #new Hamamtsu detectors
+        Data1 = []
+        Data2 = []
+        Data3 = []
+        for idx, elem in enumerate(hdulist):
+            try: 
+                NCCD = elem.header['NCCDS']
+            except KeyError:
+                pass
+            try:
+                DATASEC = elem.header['DATASEC']
+                Xaxis = elem.header['NAXIS1']
+                Yaxis = elem.header['NAXIS2']
+                Shape = elem.data.shape
+
+                #Create matrix corresponding to the GAPS
+                GAP = np.zeros([Shape[0],gapvalue])
+                GAP[:,:] = np.nan
+                
+                ## Parse the DATASEC header string 
+                DSEC = np.array(re.findall('\\b\\d+\\b', DATASEC)).astype(int)
+                
+                ## Create image for CCD1 using the 4 amplifiers
+                if int(elem.header['FRAMEID']) == 0 or int(elem.header['FRAMEID']) == 1 or int(elem.header['FRAMEID']) == 2 or int(elem.header['FRAMEID']) == 3 :
+                    Data1.append(elem.data[DSEC[2]-1 : DSEC[3], DSEC[0]-1:DSEC[1]])
+                if int(elem.header['FRAMEID']) == 3:
+                    Data1 = np.concatenate(Data1[:],axis=1)
+                    if inst == 0: # GMOS-N 
+                        Data_S = transform_image(CCDData(Data1,unit = u.adu), shift, shift=(-0.21739/Bin[0], -1.95/Bin[0]),order = order)
+                        Data_S = transform_image(Data_S, rotate, angle=-0.004,order =order,reshape=False)
+                    else: #GMOS- S
+                        Data_S = transform_image(CCDData(Data1,unit = u.adu), shift, shift=(0.71/Bin[0], -1.2),order = order) # shift -1.2 for all binning (see gmosaic.cl line 434)
+                    Data1 = Data_S.data
+
+                ## Create image for CCD2 using the 4 amplifiers
+                ## No shift for the central CCD as the other ones are defined based on this one
+                if int(elem.header['FRAMEID']) == 4 or int(elem.header['FRAMEID']) == 5 or int(elem.header['FRAMEID']) == 6 or int(elem.header['FRAMEID']) == 7 :
+                    Data2.append(elem.data[DSEC[2]-1 : DSEC[3], DSEC[0]-1:DSEC[1]])
+                if int(elem.header['FRAMEID']) == 7:
+                    Data2 = np.concatenate(Data2[:],axis=1)             
+
+                ## Create image for CCD3 using the 4 amplifiers
+                if int(elem.header['FRAMEID']) == 8 or int(elem.header['FRAMEID']) == 9 or int(elem.header['FRAMEID']) == 10 or int(elem.header['FRAMEID']) == 11 :
+                    Data3.append(elem.data[DSEC[2]-1 : DSEC[3], DSEC[0]-1:DSEC[1]])
+                if int(elem.header['FRAMEID']) == 11:
+                    Data3 = np.concatenate(Data3[:],axis=1)                    
+                    if inst == 0: # GMOS-N
+                        Data_S = transform_image(CCDData(Data3,unit = u.adu), shift, shift=(0.1727/Bin[0], 1.48/Bin[0]),order =order)
+                        Data_S = transform_image(Data_S, rotate, angle=-0.00537,order =order,reshape=False)
+                    else: # GMOS-S
+                        Data_S = transform_image(CCDData(Data3,unit = u.adu), shift, shift=(-0.73/Bin[0], 0),order =order)
+                    Data3 = Data_S.data
+                    
+            except KeyError:
+                pass
+        
+        #Create the full image inserting the chip gaps
+        DT = [Data1,GAP,Data2,GAP,Data3]
+        #Update the hdulist to create the new fits file
+        hdulist[0].data = np.concatenate(DT,axis=1)
+        
+    elif iccd == 1 and inst == 1: # GMOS-S blue CCD upgrades 
+        Data1 = []
+        Data2 = []
+        Data3 = []
         Order = []
+        for idx, elem in enumerate(hdulist):
+            try: 
+                Order.append(int(elem.header['FRAMEID']))
+            except KeyError:
+                pass
+ 
+        Ord = np.argsort(Order) + 1             
+
+
+        for idx, elem in enumerate(hdulist):
+            if idx < len(hdulist)-1:
+                try: 
+                    NCCD = hdulist[Ord[idx]].header['NCCDS']
+                except KeyError:
+                    pass
+                try:
+
+                    DATASEC = hdulist[Ord[idx]].header['DATASEC']
+
+                    data = hdulist[Ord[idx]].data
+                    Xaxis = hdulist[Ord[idx]].header['NAXIS1']
+                    Yaxis = hdulist[Ord[idx]].header['NAXIS2']
+                    Shape = hdulist[Ord[idx]].data.shape
+
+                    #Create matrix corresponding to the GAPS
+                    GAP = np.zeros([Shape[0],gapvalue])
+                    GAP[:,:] = np.nan
+ 
+                    ## Parse the DATASEC header string 
+                    DSEC = np.array(re.findall('\\b\\d+\\b', DATASEC)).astype(int)
+                    
+                    # Shift and rotate the CCD1 
+                    if int(hdulist[Ord[idx]].header['FRAMEID']) == 0:
+                        if DSEC[0] == 1:
+                            Data1 = data[DSEC[2]-1 : DSEC[3]+1, DSEC[0]-1:DSEC[1]]
+                        else:
+                            Data1 = data[DSEC[2]-1 : DSEC[3]+1, DSEC[0]-1:DSEC[1]+1]
+                        Data_S = transform_image(CCDData(Data1,unit = u.adu), shift, shift=(-0.22/Bin[0], -2.49/Bin[0]),order =order)
+                        Data_S = transform_image(Data_S, rotate, angle=-0.011,order =order,reshape=False)
+                        Data1 = Data_S.data
+                    
+                    # Get data for the CCD2 
+                    # No shift or rotation as the other CCDs are defined based on this one
+                    if int(hdulist[Ord[idx]].header['FRAMEID']) == 1:
+                        if DSEC[0] == 1:
+                            Data2 = data[DSEC[2]-1 : DSEC[3]+1, DSEC[0]-1:DSEC[1]]
+                        else:
+                            Data2 = data[DSEC[2]-1 : DSEC[3]+1, DSEC[0]-1:DSEC[1]+1]
+                    
+                    # Shift and rotate the CCD1 
+                    if int(hdulist[Ord[idx]].header['FRAMEID']) == 2:
+                        if DSEC[0] == 1:
+                            Data3 = data[DSEC[2]-1 : DSEC[3]+1, DSEC[0]:DSEC[1]+1]
+                        else:
+                            Data3 = data[DSEC[2]-1 : DSEC[3]+1, DSEC[0]-1:DSEC[1]+1]
+                        Data_S = transform_image(CCDData(Data3,unit = u.adu), shift, shift=(2.04/Bin[0], 5.31/Bin[0]),order =order)
+                        Data_S = transform_image(Data_S, rotate, angle=-0.012,order =order,reshape=False)
+                        Data3 = Data_S.data                    
+                    
+
+                except KeyError:
+                    pass
+
+        #Create the full image inserting the chip gaps
+        if len(hdulist) == 4:                
+            DS = [Data1,GAP,Data2,GAP,Data3]
+        if len(hdulist) == 3:
+            DS = [Data1,GAP,Data2]
+        if len(hdulist) == 2:
+            DS = [Data1]
+        #Update the hdulist to create the new fits file
+        hdulist[0].data = np.concatenate(DS[:],axis=1)
+        
+    else:
+        print('Is considering the else option for detector types')
+        Order = []
+        Data = []
         for idx, elem in enumerate(hdulist):
             try: 
                 Order.append(int(elem.header['FRAMEID']))
@@ -631,75 +920,53 @@ def GMOS_open2(image):
                     Xaxis = hdulist[Ord[idx]].header['NAXIS1']
                     Yaxis = hdulist[Ord[idx]].header['NAXIS2']
                     Shape = hdulist[Ord[idx]].data.shape
-                    if Bin[0] == 4:
-                        GAP = np.zeros([Shape[0]-1,11])
-                    if Bin[0] == 2:   
-                        GAP = np.zeros([Shape[0]-1,22])
-                    if Bin[0] == 1:   
-                        GAP = np.zeros([Shape[0]-1,44])    
+                    GAP = np.zeros([Shape[0],gapvalue])
                     GAP[:,:] = np.nan
+                    DSEC = np.array(re.findall('\\b\\d+\\b', DATASEC)).astype(int)
                     if int(hdulist[Ord[idx]].header['FRAMEID']) == 2 or int(hdulist[Ord[idx]].header['FRAMEID']) == 4:
                         Data.append(GAP)
-                    Data.append(data[int(DATASEC.replace('[','').replace(']','').split(',')[1].split(':')[0])-1 : int(DATASEC.replace('[','').replace(']','').split(',')[1].split(':')[1])-1, int(DATASEC.replace('[','').replace(']','').split(',')[0].split(':')[0]):int(DATASEC.replace('[','').replace(']','').split(',')[0].split(':')[1])+1])
+                    if DSEC[0] == 1:
+                        Data.append(data[DSEC[2]-1 : DSEC[3], DSEC[0]-1:DSEC[1]])
+                    else: 
+                        Data.append(data[DSEC[2]-1 : DSEC[3], DSEC[0]-1:DSEC[1]+1])
                 except KeyError:
                     pass
     
         hdulist[0].data = np.concatenate(Data[:],axis=1)
-    else:    
-     
-        for idx, elem in enumerate(hdulist):
-            try: 
-                NCCD = elem.header['NCCDS']
-            except KeyError:
-                pass
-            try:
-                DATASEC = elem.header['DATASEC']
-                Xaxis = elem.header['NAXIS1']
-                Yaxis = elem.header['NAXIS2']
-                Shape = elem.data.shape
-                GAP = np.zeros([Shape[0]-1,int(76/Bin[0])])
-                GAP[:,:] = np.nan
-                if int(elem.header['FRAMEID']) == 4 or int(elem.header['FRAMEID']) == 8:
-                    Data.append(GAP)
-                Data.append(elem.data[int(DATASEC.replace('[','').replace(']','').split(',')[1].split(':')[0])-1 : int(DATASEC.replace('[','').replace(']','').split(',')[1].split(':')[1])-1, int(DATASEC.replace('[','').replace(']','').split(',')[0].split(':')[0])-1:int(DATASEC.replace('[','').replace(']','').split(',')[0].split(':')[1])-1])
-            except KeyError:
-                pass
-    
-        hdulist[0].data = np.concatenate(Data[:],axis=1)
     
     return hdulist
 
-
-def GMOS_open(image):
-    
-    telescope, obsparam = CheckInstrument(image)
-    hdulist = fits.open(image[0])
-    
-    
-    X1 = hdulist[1].data
-    X2 = hdulist[2].data
-    X3 = hdulist[3].data
-    X4 = hdulist[4].data
-    
-    if hdulist[0].header[obsparam['grating']] != 'MIRROR': 
-        X5 = hdulist[5].data
-        X6 = hdulist[6].data
-        X7 = hdulist[7].data
-        X8 = hdulist[8].data
-        X9 = hdulist[9].data
-        X10 = hdulist[10].data
-        X11 = hdulist[11].data
-        X12 = hdulist[12].data
-    
-        Chip_Gap = np.zeros((2088, 52))
-    
-        X = np.concatenate([X1[24:,1:256],X2[24:,32:288],X3[24:,0:256],X4[24:,32:273],Chip_Gap,X5[24:,6:256],X6[24:,32:288],X7[24:,0:256],X8[24:,32:272],Chip_Gap,X9[24:,6:256],X10[24:,32:288],X11[24:,0:256],X12[24:,32:288]],axis = 1)    
-    else:
-        X = np.concatenate([X1[24:,0:255],X2[24:,32:287],X3[24:,0:255],X4[24:,32:287]],axis = 1)    
-    
-    hdulist[0].data = X 
-    
-    return hdulist
+#
+#def GMOS_open(image):
+#    
+#    telescope, obsparam = CheckInstrument(image)
+#    hdulist = fits.open(image[0])
+#    
+#    
+#    X1 = hdulist[1].data
+#    X2 = hdulist[2].data
+#    X3 = hdulist[3].data
+#    X4 = hdulist[4].data
+#    
+#    if hdulist[0].header[obsparam['grating']] != 'MIRROR': 
+#        X5 = hdulist[5].data
+#        X6 = hdulist[6].data
+#        X7 = hdulist[7].data
+#        X8 = hdulist[8].data
+#        X9 = hdulist[9].data
+#        X10 = hdulist[10].data
+#        X11 = hdulist[11].data
+#        X12 = hdulist[12].data
+#    
+#        Chip_Gap = np.zeros((2088, 52))
+#    
+#        X = np.concatenate([X1[24:,1:256],X2[24:,32:288],X3[24:,0:256],X4[24:,32:273],Chip_Gap,X5[24:,6:256],X6[24:,32:288],X7[24:,0:256],X8[24:,32:272],Chip_Gap,X9[24:,6:256],X10[24:,32:288],X11[24:,0:256],X12[24:,32:288]],axis = 1)    
+#    else:
+#        X = np.concatenate([X1[24:,0:255],X2[24:,32:287],X3[24:,0:255],X4[24:,32:287]],axis = 1)    
+#    
+#    hdulist[0].data = X 
+#    
+#    return hdulist
     
 
 
@@ -719,16 +986,16 @@ def Create_Flat(image_list,**kw):
 
     ###### Parse the argument sent through the function #######
 
-    # Do the program displays text during the processing ?
+    # Does the program display text during the processing ?
     # [False], True
     if 'Verbose' in kw:
         verbose = kw['Verbose']
     else:
         verbose = False
     
-    # Do the program create a fits file with the MasterFlat ?
+    # Does the program create a fits file with the MasterFlat ?
     # WriteFile = True : Create a fits file named MasterFlat.fits
-    # WriteFile = False : Do not create any fits file
+    # WriteFile = False : Does not create any fits file
     # WriteFile = 'any string' : Create a fits file named the string given
     # [False]
     if 'WriteFile' in kw:
@@ -787,7 +1054,8 @@ def Create_Flat(image_list,**kw):
 
 
     ##### NEED TO IMPROVE THE FITTING OF THE FLAT RESPONSE #####
-
+    
+    times = []
     Flat = []
     for image in image_list:
         if AddFits:
@@ -799,32 +1067,22 @@ def Create_Flat(image_list,**kw):
             hdulist = GMOS_open(toopen)
         else:
             hdulist = fits.open(toopen)
+            
         DFlat = hdulist[0].data-MasterBias
         Bias = DFlat
+
+        times.append(hdulist[0].header['DATE-OBS'])      
 
         index = np.argwhere(np.isnan(DFlat[10,:]))
         mask = np.ones(len(DFlat[10,:]), dtype=bool)
         mask[index] = False        
         xdata = np.arange(DFlat.shape[0])
-        flat_1d = np.median(DFlat[int(len(xdata)*0.2):-int(len(xdata)*0.2),:],axis=0)#convolve(np.median(DFlat,axis=0), Box1DKernel(5))
-        #spl = UnivariateSpline(xdata[mask], flat_1d[mask], ext=0, k=2 ,s=1000)
-        #aa = 10.0**spl(xdata)
+        flat_1d = np.median(DFlat[int(len(xdata)*0.2):-int(len(xdata)*0.2),:],axis=0)
+
         for i in range(len(DFlat)):
             Bias[i,:] = DFlat[i,:]/flat_1d
         
-#        index = np.argwhere(np.isnan(DFlat[10,:]))
-#        mask = np.ones(len(DFlat[10,:]), dtype=bool)
-#        mask[index] = False
- #       for i in range(10,len(DFlat)):
- #           index = np.argwhere(np.isnan(DFlat[i,:]))
- #           mask = np.ones(len(DFlat[i,:]), dtype=bool)
- #           mask[index] = False
-#            xdata = np.arange(DFlat.shape[1])
- #           spl = UnivariateSpline(xdata[mask], DFlat[i,mask], ext=0, k=1,s=9999999)
- #          flat_curve = spl(xdata)
- #           aa = savitzky_golay(DFlat[i,:],21,2)
- #           Bias[i,:] = DFlat[i,:]/aa #flat_curve
-        Flat.append(Bias) #/np.median((hdulist[0].data[592:2227,:]-MasterBias[592:2227,:])))
+        Flat.append(Bias)
     
     
     
@@ -843,8 +1101,35 @@ def Create_Flat(image_list,**kw):
     
     # Create a fits file containing the master flat if WriteFile = True   
     hdulist[0].data = MasterFlat
+    t = Time(times, format='isot', scale='utc')
+    MidTime = t[0] + (t[-1]-t[0])/2
+
+    print('Update header')
+    ## Header updates 
+    
+    hdulist[0].header['Median'] = np.nanmedian(MasterFlat)
+    hdulist[0].header['Mean'] = np.nanmean(MasterFlat)
+    hdulist[0].header['Std'] = np.nanstd(MasterFlat)
+
+    
+    hdulist[0].header['MIDTIME'] = (MidTime.isot, 'SP: midtime of the individual flats')
+    hdulist[0].header['CREATIME'] = (Time.now().isot, 'SP: Creation time of the Master flat')
+    hdulist[0].header['NUMDARKS'] = (len(image_list), 'SP: Number of individual flat used')
+    hdulist[0].header['PIPELINE'] = ('Spectroscopic Pipeline', 'SP: pipeline used to created this file')
+    hdulist[0].header['PROCTYPE'] = ('MASTER FLAT', 'SP: Type of processed file')
+    hdulist[0].header['FILENAME'] = (NameFlat, 'SP: Name of the file')
+    hdulist[0].header['METHOD'] = ('Median','Method used to combine the individual biases')
+    
+    hdulist[0].header['HISTORY'] =  'Median' + ' master flat created from ' +  str(len(image_list)) + ' individual flat'
+    hdulist[0].header['HISTORY'] =  'on ' + str(Time.now().isot) + ' (YYYY-MM-DD hh:mm:ss UT) from'
+    for elem in image_list:
+        hdulist[0].header['HISTORY'] = elem
+
+
     if WriteFile:
         hdulist.writeto(NameFlat, overwrite = OverWrite)
+    
+    
     
     hdulist.close()
     
@@ -1166,16 +1451,16 @@ def Shift_Spec(Spectre,Err,Wavel,**kw):
     print(Instrument)
     
     if Instrument == 'Deveny':
-        Inter = np.linspace(0.7100,0.7300,1000)
+        Inter = np.linspace(0.7500,0.7700,1000)
         
         f1 = interp1d(Wavel[0], Spectre[0])
-        f2 = interp1d(Wavel[1], Spectre[1])
+        f2 = interp1d(Wavel[1], Spectre[1]) 
         
         diffX = []
         diffY = []
         sub = np.linspace(-0.004,0.004,50000)
         for i in sub:
-            Inter2 = np.linspace(0.7100+i,0.7300+i,1000)
+            Inter2 = np.linspace(0.7500+i,0.7700+i,1000)
             New1 = f1(Inter2)
             New2 = f2(Inter)
             dev = np.nanstd(New1/New2)
@@ -1394,6 +1679,35 @@ def Detect_Spectra(data,Bin = 4,**kw):
     
     if Method == 'Maximum':
         
+        print(Instrument)
+        if Instrument == 'ALFOSC_FASU': 
+            xs = range(50,200)
+            SS = np.median(data[50:-50,270:300],axis=1)
+            
+            max_index, max_value = max(enumerate(SS), key=operator.itemgetter(1))
+            
+            p0 = [0,max(SS.flatten()),2.24,1.41,max_index+50] 
+            
+            coeff, fit, FWHM, Mask,XOut = Fit_MOFFAT(xs,SS,p0,SClip = False)
+            
+#            print(coeff)
+            
+            xs = np.array(xs)
+        
+#            f, axarr = plt.subplots(2)
+#            axarr[0].plot(range(100,400),SS)
+#            axarr[0].plot(xs,fit)
+            
+#            axarr[1].plot(xs,SS)
+#            axarr[1].plot(xs,fit)
+        
+#            axarr[1].text((p0[4])+2*FWHM,p0[1]/2+50,'Center = ' + str(round(p0[4], 3)))
+#            axarr[1].text((p0[4])+2*FWHM,p0[1]/2,'FWHM = ' + str(round(FWHM, 3)) + ' pixels' )
+#            plt.show()
+            return coeff[4]
+            
+            
+            
         if Instrument == 'Deveny' or Instrument == 'Soar':
             
             xs = range(100,400)
@@ -1489,9 +1803,71 @@ def Lin_Interp(data_x,data_y,n_bin):
     
 
 
-def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
+def Get_Instrument_info(hdulist):
+        # Set instrument north or south
+    
+    Bin = np.array(re.findall('\\b\\d+\\b', hdulist[1].header['CCDSUM'])).astype(int)
     
     
+    hselect = hdulist[0].header['INSTRUME']
+    if "GMOS-S" in hselect:
+        inst = 1
+    else:
+        inst = 0    # assume GMOS-N
+
+    # Set ishamamatsu flag
+    imgets = hdulist[0].header['DETTYPE']
+    if imgets == "S10892" or imgets == "S10892-N":
+    # KL - check if GMOS-S values are valid for GMOS-N Hamamatsu
+        ishamamatsu = True
+    else:
+        ishamamatsu = False
+
+    # Set gapvalue
+    #if l_gap == "default":
+    if ishamamatsu:
+        if inst == 1: # GMOS-S
+            gapvalue = int(61/Bin[0]) #hcode ##M CHIP_GAP
+        else:  # GMOS-N
+            gapvalue = int(67/Bin[0])
+            
+    else:
+        gapvalue = int(37/Bin[0])
+
+    # Set the detector type here
+    # GMOS-N
+    if inst == 0: 
+        l_struct = hdulist[0].header['DETTYPE']
+        if l_struct == "SDSU II CCD": #Current EEV CCDs
+            iccd = 0
+        elif l_struct == "SDSU II e2v DD CCD42-90":
+            # New e2vDD CCDs
+            iccd = 1
+        elif l_struct == "S10892-N":  # Hamamatsu CCDs
+            iccd = 2
+    
+    elif inst == 1: # GMOS-S
+        l_struct = hdulist[0].header['DETTYPE']
+        if l_struct == "S10892":
+            # Hamamatsu CCDs
+            iccd = 2
+        else:
+            l_struct = hdulist[0].header['DETECTOR']
+            if l_struct == "GMOS + Blue1 + new CCD1":
+                iccd = 1 # GMOS-S blue CCD upgrades
+            else:
+                iccd = 0 # Original CCDs    
+                    
+
+                
+                
+    return(iccd,gapvalue)
+
+
+
+def Fit_Trace(hdulist,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
+    
+    data = hdulist[0].data
     
     if 'Instrument' in kw:
         Instrument = kw['Instrument']
@@ -1515,6 +1891,79 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
         
         
     print(Instrument)    
+
+
+
+    if Instrument == 'ALFOSC_FASU':
+    
+        x_size = np.shape(data)[1]
+        MASK = np.array(range(x_size), dtype=bool)  
+        MASK[:10] = False
+        MASK[-10:] = False
+        
+        Trace = np.array(range(x_size), dtype=np.float)
+        Trace[:] = 0.
+    
+        bkg = np.array(range(x_size), dtype=np.float)
+        bkg[:] = 0.        
+        
+        print(Start)
+        
+        xs = range(int(Start[1])-Range,int(Start[1])+Range)
+        SS = data[xs,Start[0]]
+        
+        p0 = [0,np.max(SS),2.24,1.41,Start[1]]
+        
+        coeffIn, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0, SClip = SClip)
+
+        Trace[Start[0]] = float(coeffIn[4])
+
+        
+        p0 = coeffIn
+        for i in range(Start[0],15,-1):
+            if i > 30 :
+                xs = range(int(p0[4])-Range,int(p0[4])+Range)
+                SS = np.median(data[xs,i-15:i+15],axis=1)
+                print("Extraction of the column {0:4}".format(str(i)), end='\r')
+                coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
+                if coeff[4] < 0 or coeff[4] > 2000:
+                    coeff = p0
+                MASK[i] = Mask
+                Trace[i] = float(coeff[4])
+                bkg[i] = coeff[0]
+                if coeff[4] < 500 and coeff[4] > 12:
+                    p0 = coeff
+
+        p0 = coeffIn
+        for i in range(Start[0],1060,1):
+            xs = range(int(p0[4])-Range,int(p0[4])+Range)
+            SS = np.median(data[xs,i-15:i+15],axis=1)
+            coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn,SClip = SClip)
+            if coeff[4] < 0 or coeff[4] > 2000:
+                coeff = p0
+            MASK[i] = Mask
+            Trace[i] = float(coeff[4])
+            bkg[i] = coeff[0]
+            if coeff[4] < 500 and coeff[4] > 12:
+                    p0 = coeff
+
+    #    MASK[CHIP_GAP[1][0]:CHIP_GAP[1][1]] = False
+        Xind = np.array(range(x_size))    
+        
+        Pol = np.polyfit(Xind[MASK], Trace[MASK], 5)
+        p = np.poly1d(Pol)
+        Tr = p(range(x_size))
+        
+#        plt.figure()
+    
+#        plt.plot(Xind[MASK],Trace[MASK])
+#        plt.plot(Xind[MASK],Tr[MASK])
+#        plt.figure()
+#        plt.plot(Xind[MASK],bkg[MASK])
+
+        return Trace, bkg, MASK 
+
+
 
 
     if Instrument == 'Soar':
@@ -1545,7 +1994,7 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
             if i > 20 :
                 xs = range(int(p0[4])-Range,int(p0[4])+Range)
                 SS = np.median(data[xs,i-15:i+15],axis=1)
-                print(i)
+                print("Extraction of the column {0:4}".format(str(i)), end='\r')
                 coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
                 if coeff[4] < 0 or coeff[4] > 2030:
                     coeff = p0
@@ -1566,7 +2015,7 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
         for i in range(Start[0],2030,1):
             xs = range(int(p0[4])-Range,int(p0[4])+Range)
             SS = np.median(data[xs,i-15:i+15],axis=1)
-            print(i)
+            print("Extraction of the column {0:4}".format(str(i)), end='\r')
             coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn,SClip = SClip)
             if coeff[4] < 0 or coeff[4] > 2000:
                 coeff = p0
@@ -1623,10 +2072,10 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
 
         p0 = coeffIn
         for i in range(Start[0],15,-1):
-            if i > 299 :
+            if i > 100 :
                 xs = range(int(p0[4])-Range,int(p0[4])+Range)
                 SS = np.median(data[xs,i-15:i+15],axis=1)
-                print(i)
+                print("Extraction of the column {0:4}".format(str(i)), end='\r')
                 coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
                 if coeff[4] < 0 or coeff[4] > 2000:
                     coeff = p0
@@ -1637,7 +2086,7 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
                     p0 = coeff
 
         p0 = coeffIn
-        for i in range(Start[0],1840,1):
+        for i in range(Start[0],2050,1): # 1840
             xs = range(int(p0[4])-Range,int(p0[4])+Range)
             SS = np.median(data[xs,i-15:i+15],axis=1)
             coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn,SClip = SClip)
@@ -1646,12 +2095,13 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
             MASK[i] = Mask
             Trace[i] = float(coeff[4])
             bkg[i] = coeff[0]
-            p0 = coeff
+            if coeff[4] < 500 and coeff[4] > 12:
+                    p0 = coeff
 
     #    MASK[CHIP_GAP[1][0]:CHIP_GAP[1][1]] = False
         Xind = np.array(range(x_size))    
         
-        Pol = np.polyfit(Xind[MASK], Trace[MASK], 5)
+        Pol = np.polyfit(Xind[MASK], Trace[MASK], 1)
         p = np.poly1d(Pol)
         Tr = p(range(x_size))
         
@@ -1666,20 +2116,52 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
         
     if Instrument == 'GMOSS' or Instrument == 'GMOSN':
  
-        if Binning == '2':
-            MASK = np.array(range(2250), dtype=bool)  
+        # Get instrument ID and chip gap size
+        iccd, gapvalue = Get_Instrument_info(hdulist)
         
-            MASK[0:751] = False
-            MASK[2058:] = False
-            MASK[CHIP_GAP_B2[0][0]:CHIP_GAP_B2[0][1]] = False
+        
+        # Get the dimension of the image
+        Xaxis = hdulist[0].header['NAXIS1']
+        Yaxis = hdulist[0].header['NAXIS2']
+        
+        # Create a MASK of the sixe of the Xaxis
+        MASK = np.array(range(Xaxis), dtype=bool)   
+        
+        # Get the grating information
+        Grating = hdulist[0].header['GRATING']
+        if Binning == '2':
+#            MASK = np.array(range(2250), dtype=bool)  
+        
+            # Ignore part of the detector for the R150 as the sensitivity is too low at these wavelengths
+            if '150' in Grating:
+                if iccd == 1:
+                    MASK[2292:] = False
+                    Begin = 0
+                else:
+                    Begin = 300
+                    MASK[0:751] = False # Still need to fine tuned these values for other detectors 
+                    MASK[2058:] = False
             
-            Trace = np.array(range(2250), dtype=np.float)
+            # Compute the chip gap location
+            # There are two gaps and three sections
+            # First GAP
+            Start1 = (Xaxis-(gapvalue*2))/3 - 2 # the two pixels are used to avoid weird gap edge effetcs
+            End1 = (Xaxis-(gapvalue*2))/3+gapvalue + 2 # the two pixels are used to avoid weird gap edge effetcs
+            MASK[Start1:End1] = False
+            
+            # Second GAP 
+            Start2 = End1 - 2 + Xaxis  -2 # the two pixels are used to avoid weird gap edge effetcs
+            End2 = End1 - 2 + Xaxis + gapvalue + 2 # the two pixels are used to avoid weird gap edge effetcs
+            MASK[Start2:End2] = False            
+            
+            
+            Trace = np.array(range(Xaxis), dtype=np.float)
             Trace[:] = 0.
 
-            bkg = np.array(range(2250), dtype=np.float)
+            bkg = np.array(range(Xaxis), dtype=np.float)
             bkg[:] = 0.
             
-        if Binning == '4':
+        if Binning == '4': # Need to be fine tuned based on detector ... not updated with new iccd and gapvalue information
             if 'e2v DD CCD42-90' in Detector:
                 MASK = np.array(range(1555), dtype=bool) 
                 MASK[CHIP_GAP_B4[0][0]:CHIP_GAP_B4[0][1]] = False
@@ -1699,6 +2181,7 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
                 bkg = np.array(range(1562), dtype=np.float)
                 bkg[:] = 0.
         
+
         New_xs = range(int(Start[1])-Range,int(Start[1])+Range)
 
         New_SS = data[New_xs,Start[0]]
@@ -1716,12 +2199,14 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
         if Binning == '2':
             p0 = coeffIn
             for i in range(Start[0],15,-1):
-                if i > 1050 or i < 1020 and i > 300 :
+                if i > End1 or i < Start1 and i > Begin:
                     New_xs = range(int(p0[4])-Range,int(p0[4])+Range)
                     New_SS = np.median(data[New_xs,i-15:i+15],axis=1)
                     xs, SS = Lin_Interp(New_xs,New_SS,10)
-
-                    print(i)
+                    
+                    print("Extraction of the column {0:4}".format(str(i)), end='\r')
+                    sys.stdout.flush()
+                    
                     coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
                     if coeff[4] < 0 or coeff[4] > 2000:
                         coeff = p0
@@ -1733,7 +2218,7 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
             p0 = coeffIn
             for i in range(Start[0],2250,1):
                 if i > 2100 or i < 2050:
-                    print(i)
+                    print("Extraction of the column {0:4}".format(str(i)), end='\r')
                     New_xs = range(int(p0[4])-Range,int(p0[4])+Range)
                     New_SS = np.median(data[New_xs,i-15:i+15],axis=1)
                     xs, SS = Lin_Interp(New_xs,New_SS,10)
@@ -1751,23 +2236,24 @@ def Fit_Trace(data,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **kw):
                 New_xs = range(int(p0[4])-Range,int(p0[4])+Range)  
                 New_SS = np.median(data[New_xs,i-15:i+15],axis=1)
                 xs, SS = Lin_Interp(New_xs,New_SS,10)
-                print(i)
+                print("Extraction of the column {0:4}".format(str(i)), end='\r')
                 coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
-                if coeff[4] < 0 or coeff[4] > 2000:
+                if coeff[4] < 0 or coeff[4] > 1040:
                     coeff = p0
                 MASK[i] = Mask
                 Trace[i] = float(coeff[4])
+                print(coeff[4])
                 bkg[i] = coeff[0]
                 p0 = coeff
              
             p0 = coeffIn
             for i in range(Start[0],1500,1):
-                print(i)
+                print("Extraction of the column {0:4}".format(str(i)), end='\r')
                 New_xs = range(int(p0[4])-Range,int(p0[4])+Range)
                 New_SS = np.median(data[New_xs,i-15:i+15],axis=1)
                 xs, SS = Lin_Interp(New_xs,New_SS,10)
                 coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn,SClip = SClip)
-                if coeff[4] < 0 or coeff[4] > 1050:
+                if coeff[4] < 0 or coeff[4] > 1040:
                     coeff = p0
                 MASK[i] = Mask
                 Trace[i] = float(coeff[4])
@@ -1835,7 +2321,7 @@ def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
     
     
     
-    if Instrument == 'Deveny' or Instrument == 'Soar':
+    if Instrument == 'Deveny' or Instrument == 'Soar' or Instrument =='ALFOSC_FASU':
         
         if len(Mask) == 0:
             Mask = np.ones(x_size, dtype=bool)
@@ -1843,7 +2329,7 @@ def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
         
         Spec = []
         for i in range(x_size):
-            Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]- bkg[i]
+            Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]
             Spec.append(sum(Sec))
         
 #        plt.figure()
@@ -1865,31 +2351,46 @@ def Extract_Spectrum(data,Trace,bkg,FWHM = 6, Mask = [],**kw):
                     Mask = np.ones(1562, dtype=bool)
         
         Spec = []
+        Bckg = []
         if Binning == '2':
             for i in range(2250):
-                Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]- bkg[i]
+                Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]
                 Spec.append(sum(Sec))
+                Bckg.append(bkg[i])
         if Binning == '4':
             if Instrument == 'GMOSS':
                 for i in range(1499):
                     if Trace.astype(int)[i] < 10:
                         Trace[i] = 100
-                    Sec = data[Trace.astype(int)[i]-(FWHM*2):Trace.astype(int)[i]+(FWHM*2)+1,i]- bkg[i]
+                    Sec = data[Trace.astype(int)[i]-(FWHM*2):Trace.astype(int)[i]+(FWHM*2)+1,i]
                     New_xs, SS = Lin_Interp(range(Trace.astype(int)[i]-(FWHM*2),Trace.astype(int)[i]+(FWHM*2)+1),Sec,10)
                     cond1 = New_xs<Trace[i]+FWHM
                     cond2 = New_xs>Trace[i]-FWHM
                     Cond = cond1*cond2
-                    Spec.append(sum(SS*Cond))    
+                    Spec.append(sum(SS*Cond))
+                    Bckg.append(bkg[i])
             if Instrument == 'GMOSN':
                 for i in range(1499):
-                    Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]- bkg[i]
-                    Spec.append(sum(Sec))          
+#                    if Trace.astype(int)[i] < 10:
+#                        Trace[i] = 100
+#                    Sec = data[Trace.astype(int)[i]-(FWHM*2):Trace.astype(int)[i]+(FWHM*2)+1,i]
+#                    New_xs, SS = Lin_Interp(range(Trace.astype(int)[i]-(FWHM*2),Trace.astype(int)[i]+(FWHM*2)+1),Sec,10)
+#                    cond1 = New_xs<Trace[i]+FWHM
+#                    cond2 = New_xs>Trace[i]-FWHM
+#                    Cond = cond1*cond2
+#                    Spec.append(sum(SS*Cond))
+#                    Bckg.append(bkg[i])
+                    
+                    
+                    Sec = data[Trace.astype(int)[i]-FWHM:Trace.astype(int)[i]+FWHM+1,i]
+                    Spec.append(sum(Sec))
+                    Bckg.append(bkg[i])
         
 #        plt.figure()
 #        Spec = np.array(Spec)
 #        plt.plot(Spec[Mask])    
         
-        return Spec
+        return Spec, Bckg
     
     
     
