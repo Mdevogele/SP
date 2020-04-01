@@ -17,6 +17,8 @@ from astropy.io import fits
 
 def Detect_Spectra(filename,OutName,DetecLim):
     
+    print(DetecLim)
+    
     Offset = []
     telescope, obsparam = CheckInstrument([filename[0]])
         
@@ -57,7 +59,10 @@ def Detect_Spectra(filename,OutName,DetecLim):
     if Bin == 4:
         Spec_Loc = Spec_Loc+400
     if Bin == 2:
-        Spec_Loc = Spec_Loc+800
+        if np.shape(hdulist[0].data)[0] > 600:
+            Spec_Loc = Spec_Loc+800
+        else:
+            Spec_Loc = Spec_Loc
     
 
     SpecLocName = OutName + '_Spec_loc.txt'
@@ -68,6 +73,21 @@ def Detect_Spectra(filename,OutName,DetecLim):
     with open(OffsetName,'w') as f:
         simplejson.dump(list(Offset), f)
     
+
+    Offset = np.sort(np.array(Offset).astype(int))
+    Spec_Loc = np.sort(Spec_Loc)
+    
+    for idx, elem in enumerate(filename): 
+        hdulist = fits.open(elem)
+        data = hdulist[0].data
+        Range = range(np.min(Spec_Loc)-20,np.max(Spec_Loc))
+        bckg = np.nanmedian(data[Range,:],axis=0)
+        np.savetxt(elem.replace('.fits','').replace('_Procc','') + '_Bckg' + '.txt',bckg)
+        
+
+
+
+
     print(Spec_Loc)
     print(Off)
         

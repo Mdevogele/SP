@@ -7,12 +7,19 @@
 import argparse, shlex
 
 import SP_Toolbox as SP
+import logging
 
 import SP_diagnostics as diag
 
 
 def Preproc(filenames,MasterBias,MasterFlat,Verbose,Suffix,Diagnostic):
 
+    logging.info('****************************************')
+    logging.info('****** Start of SP_Preproc script ******')
+    logging.info('****************************************')
+    
+    
+    
     Object_out = []
     Object_in = []
     compteur = 0
@@ -35,7 +42,10 @@ def Preproc(filenames,MasterBias,MasterFlat,Verbose,Suffix,Diagnostic):
         diag.create_website('Pre-processing_Log.html')
         diag.add_PreProc(Object_out,MasterBias,MasterFlat,'Pre-processing_Log.html')
 
-        
+
+    logging.info('**************************************')
+    logging.info('****** End of SP_Preproc script ******')
+    logging.info('**************************************')        
 
 
 

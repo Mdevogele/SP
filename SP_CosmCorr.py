@@ -16,7 +16,7 @@ import SP_diagnostics as diag
 
 from astropy.io import fits
 
-#import cosmic
+import cosmic
 
 from astroscrappy import detect_cosmics
 
@@ -24,22 +24,34 @@ from astroscrappy import detect_cosmics
 
 def Cosmic(filename,Diagnostic):
     
+    LACOSMIC = False
+    
     Out_Name = []
-#    telescope, obsparam = CheckInstrument([filename[0]])
     for idx, elem in enumerate(filename): 
+        
+        # load the fits files
+        print(elem)
         hdulist = fits.open(elem)
+        # Extract data from fits files
         data=hdulist[0].data
-#        c = cosmic.cosmicsimage(data,satlevel=65000)
         
-        crmask, c = detect_cosmics(data, inmask=None, satlevel=65000)
-        
-        
-#        c.run(maxiter = 1)
-#        hdulist[0].data = c.cleanarray
-        hdulist[0].data = c
+        #Start cosmic correction
+        if LACOSMIC:
+            # Does not work for python 3 as the cosmic code has been developped for python 2 only
+            # However, for some reason the detect_cosmic code happen to not work for some images without throwing any errors ?? 
+            # Keep the cosmic option here for such rare cases 
+            import cosmic
+            c = cosmic.cosmicsimage(data,satlevel=65000)
+            c.run(maxiter = 1)
+            hdulist[0].data = c.cleanarray
+        else:
+            crmask, c = detect_cosmics(data, inmask=None, satlevel=65000)
+            hdulist[0].data = c
 
+        # Create the output name. Remove _Procc and add _CosmCorr to the name
         Out_Name.append(elem.replace('.fits','').replace('_Procc','') + '_' + '_CosmCorr' + '.fits')
-        hdulist.writeto(elem.replace('.fits','').replace('_Procc','') + '_' + '_CosmCorr' + '.fits')
+        print(Out_Name[idx])
+        hdulist.writeto(Out_Name[idx])
         
     if Diagnostic: 
         diag.create_website('Cosmic-Correction_Log.html')

@@ -17,6 +17,9 @@ from SP_CheckInstrument import CheckInstrument
 
 import numpy as np
 
+from astropy.visualization import PercentileInterval, ZScaleInterval
+
+
 
 from tkinter import *
 from tkinter import ttk
@@ -47,8 +50,12 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
         Mask[:,:] =  0
         
         
-        if telescope == 'Deveny' or telescope == 'DEVENY' or telescope == 'SOAR':
-            DetecFlags = {'Instrument':'Deveny'}
+        if telescope == 'Deveny' or telescope == 'DEVENY' or telescope == 'SOAR' or telescope == 'NOT':
+            if 'Deveny' or telescope == 'DEVENY':
+                DetecFlags = {'Instrument':'Deveny'}
+            if telescope == 'NOT':
+                DetecFlags = {'Instrument':'ALFOSC_FASU'}
+                
             if Method == 'auto':               
                 Center = SP.Detect_Spectra(image,Bin =2,**DetecFlags)
                 (Center)
@@ -71,19 +78,14 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
             Fdc = []
             
             if Live:
-                median = np.median(image[int(image.shape[1]*0.25):
-                                             int(image.shape[1]*0.75),
-                                             int(image.shape[0]*0.25):
-                                             int(image.shape[0]*0.75)])
-                std    = np.std(image[int(image.shape[1]*0.25):
-                                          int(image.shape[1]*0.75),
-                                          int(image.shape[0]*0.25):
-                                          int(image.shape[0]*0.75)])
+                
+                imgdat = image
+
+                Intervals = ZScaleInterval()
+                Limits = Intervals.get_limits(imgdat)
+
+                imgdat = (numpy.clip(imgdat, Limits[0],Limits[1])-Limits[0])/(old_div(Limits[1]-Limits[0],256))
     
-                imgdat= image
-                imgdat = old_div(np.clip(imgdat, median-0.5*std,
-                                   median+0.5*std),(old_div(std,256)))
-                imgdat = imgdat - np.min(imgdat)
     
                 imgdat = interp.zoom(imgdat, test.zoom)            
             
@@ -126,6 +128,7 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
             np.savetxt(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.txt',Fdc)
         if telescope == 'GMOSS' or telescope == 'GMOSN':
             DetecFlags = {'Instrument':'GMOS'}
+            print(Spec_loc)
             OffFile = Spec_loc + '_Offset.txt'
             with open(OffFile,'r') as f:
                 Offset = simplejson.load(f)
@@ -142,12 +145,13 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
     
             if telescope == 'GMOSS':
                 Center = Spec_Loc[2-idx]
+                print(Center)
             if telescope == 'GMOSN':
                 Center = Spec_Loc[idx]
                 print(Center)
                 
-            Area[0] = int(Center-200)
-            Area[1] = int(Center+200) 
+            Area[0] = int(Center-50)
+            Area[1] = int(Center+50) 
 
             print(Area)
             
@@ -170,7 +174,7 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
                 p = np.poly1d(z)
                 image[:,i] = image[:,i] - p(X)
             
-            hdulist.writeto(elem.replace('.fits','').replace('_Procc','').replace('Sub','') + '_' + Suffix + '.fits', v)
+            hdulist.writeto(elem.replace('.fits','').replace('_Procc','').replace('Sub','') + '_' + Suffix + '.fits', overwrite = True)
             Out_File.append(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits')
             
     if Diagnostic: 
