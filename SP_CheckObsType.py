@@ -92,8 +92,13 @@ def CheckObsType(filenames,telescope,obsparam):
             
         
         # Update header 
-        hdulist[0].header['SP_PRE'] = (str(True),'SP: Has this file been prepared?')
+        print('Update header')
+        hdulist[0].header['SP_PREPA'] = (str(True),'SP: Has this file been prepared?')
+        hdulist[0].header['SP_PREPR'] = (str(False),'SP: Has this file been prepared?')
+        hdulist[0].header['SP_COSMI'] = (str(False),'SP: Has this file been prepared?')
         hdulist[0].header['PROCTYPE'] = ('Prepared', 'SP: Type of processed file')
+        
+        
         
         
         # Still a special treatment for NOT, SHOULD BE FIXED
@@ -112,8 +117,8 @@ def CheckObsType(filenames,telescope,obsparam):
                 
                 # Update header
                 hdulist[0].header['HISTORY'] = 'The image has been cropped in both X and Y coordinates from :'
-                hdulist[0].header['HISTORY'] = 'X axis: ' + int(obsparam['X_crop'][0]) + ' to ' + obsparam['X_crop'][1]
-                hdulist[0].header['HISTORY'] = 'Y axis: ' + int(obsparam['Y_crop'][0]) + ' to ' + obsparam['Y_crop'][1]
+                hdulist[0].header['HISTORY'] = 'X axis: ' + str(obsparam['X_crop'][0]) + ' to ' + str(obsparam['X_crop'][1])
+                hdulist[0].header['HISTORY'] = 'Y axis: ' + str(obsparam['Y_crop'][0]) + ' to ' + str(obsparam['Y_crop'][1])
                 
                 
             if obsparam['Y_crop'] and not obsparam['X_crop']: # images need to be cropped in Y axes only
@@ -121,7 +126,7 @@ def CheckObsType(filenames,telescope,obsparam):
                 
                 # Update header
                 hdulist[0].header['HISTORY'] = 'The image has been cropped in coordinates from :'
-                hdulist[0].header['HISTORY'] = 'Y axis: ' + int(obsparam['Y_crop'][0]) + ' to ' + obsparam['Y_crop'][1]                
+                hdulist[0].header['HISTORY'] = 'Y axis: ' + str(obsparam['Y_crop'][0]) + ' to ' + str(obsparam['Y_crop'][1])                
                 
                 
             if obsparam['X_crop'] and not obsparam['Y_crop']: # images need to be cropped in X axes only
@@ -137,11 +142,14 @@ def CheckObsType(filenames,telescope,obsparam):
         # Get statistic information about the data 
         Med = np.nanmedian(data[10:-10,10:-10])
         Max = np.nanmax(data[10:-10,10:-10])
-        std0 = np.nanstd(np.median(data[10:-10,10:-10],axis=0))
-        std1 = np.nanstd(np.median(data[10:-10,10:-10],axis=1))
+        std0 = np.nanstd(np.nanmedian(data[10:-10,10:-10],axis=0))
+        std1 = np.nanstd(np.nanmedian(data[10:-10,10:-10],axis=1))
         std = np.nanstd(data[10:-10,10:-10])
         Mean =  np.nanmean(data[10:-10,10:-10])
         Median = np.nanmedian(data[10:-10,10:-10])
+        
+#        print(Mean)
+#        print(std1)
 
 
         # Update the header with statistical information about the data
@@ -255,7 +263,7 @@ def CheckObsType(filenames,telescope,obsparam):
                 EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
                 Name= telescope + '_' + index + '_' + TIME + '_ACQ_' + EXPTIME + '.fits'
                 hdulist.close()
-                shutil.copy(filename,Name)
+#                shutil.copy(filename,Name)
                 _SP_conf.filenames.append(Name)
                 logging.info('%s changed to %s' % (filename, Name))
                 print('%s changed to %s' % (filename, Name))
@@ -267,7 +275,7 @@ def CheckObsType(filenames,telescope,obsparam):
                     EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
                     Name= telescope + '_' + index + '_' + TIME + '_FLAT_' + EXPTIME + '.fits'
                     hdulist.close()
-                    shutil.copy(filename,Name)
+#                    shutil.copy(filename,Name)
                     _SP_conf.filenames.append(Name)
                     logging.info('%s changed to %s' % (filename, Name))
                     print('%s changed to %s' % (filename, Name))
@@ -279,7 +287,7 @@ def CheckObsType(filenames,telescope,obsparam):
                         EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
                         Name= telescope + '_' + filename.split('.')[1] + '_' + TIME + '_BIAS_' + EXPTIME + '.fits'
                         hdulist.close()
-                        shutil.copy(filename,Name)
+#                        shutil.copy(filename,Name)
                         _SP_conf.filenames.append(Name)
                         logging.info('%s changed to %s' % (filename, Name))
                         print('%s changed to %s' % (filename, Name))                        
@@ -330,12 +338,12 @@ def CheckObsType(filenames,telescope,obsparam):
                                     
                         Name= telescope  + '_' + index + '_' + TIME + '_' + TYPE + '_' + OBJECT + '_' + EXPTIME + '.fits'
     
-                        shutil.copy(filename,Name)
-                                
-                        _SP_conf.filenames.append(Name)
-                        logging.info('%s changed to %s' % (filename, Name))
-                        print('%s changed to %s' % (filename, Name))
-                        hdulist.close()    
+#                        shutil.copy(filename,Name)
+            hdulist[0].writeto(Name,overwrite=True)                        
+            _SP_conf.filenames.append(Name)
+            logging.info('%s changed to %s' % (filename, Name))
+            print('%s changed to %s' % (filename, Name))
+            hdulist.close()    
                        
         
         

@@ -33,6 +33,8 @@ import SP_Extract
 import SP_Combine
 import SP_Flat
 import SP_Preproc
+from SP_CheckInstrument import CheckInstrument
+
 
 import SP_Toolbox as tb
 
@@ -993,31 +995,32 @@ class simpleapp_tk(Tk):
  
         for elem in Conseq:
             
+            telescope, obsparam = CheckInstrument([files_list[elem[0][0]]])
             hdulist = fits.open(files_list[elem[0][0]])
             ExpTime = hdulist[0].header['EXPTIME']
             Type = hdulist[0].header['OBSTYPE']                
             Date = hdulist[0].header['DATE-OBS']
-            Lamp1_Text = hdulist[0].header['LAMP1SRC']
-            Lamp2_Text = hdulist[0].header['LAMP2SRC']
-            Lamp3_Text = hdulist[0].header['LAMP3SRC']
-            Lamp4_Text = hdulist[0].header['LAMP4SRC']
+            Lamp1_Text = obsparam['lamp1_name']
+            Lamp2_Text = obsparam['lamp2_name']
+            Lamp3_Text = obsparam['lamp3_name']
+            Lamp4_Text = obsparam['lamp4_name']
 
-            if hdulist[0].header['LAMP1ON']:
+            if hdulist[0].header[obsparam['lamp1']]:
                 Lamp1_OnOff = u'\u2713'
             else:
                 Lamp1_OnOff = X
                 
-            if hdulist[0].header['LAMP2ON']:
+            if hdulist[0].header[obsparam['lamp2']]:
                 Lamp2_OnOff = u'\u2713'
             else:
                 Lamp2_OnOff = X
                 
-            if hdulist[0].header['LAMP3ON']:
+            if hdulist[0].header[obsparam['lamp3']]:
                 Lamp3_OnOff = u'\u2713'
             else:
                 Lamp3_OnOff = X
                 
-            if hdulist[0].header['LAMP4ON']:
+            if hdulist[0].header[obsparam['lamp4']]:
                 Lamp4_OnOff = u'\u2713'
             else:
                 Lamp4_OnOff = X
@@ -1425,6 +1428,28 @@ class simpleapp_tk(Tk):
 ##############################################################################
 
 
+    def Pop_Cosmcorr_tree(self,elem):
+        hdulist = fits.open(elem)
+        ExpTime = hdulist[0].header['EXPTIME']
+        Type = hdulist[0].header['OBSTYPE']
+        Date = hdulist[0].header['DATE-OBS']
+        Mean = np.mean(hdulist[0].data)
+        Median = np.median(hdulist[0].data)
+        Std = np.std(hdulist[0].data)
+        self.CosmCorr_Tree = self.tree_CosmCorr.insert("",
+                                    'end',
+                                    "",
+                                    text= elem.split('/')[-1],
+                                    values=(Type,
+                                            str(ExpTime),
+                                            str("{0:.1f}".format(Mean)),
+                                            str("{0:.0f}".format(Median)),
+                                            str("{0:.1f}".format(Std)),
+                                            Date))
+
+
+
+
     def load_file_cosmcorr(self, event):
         self.fname = askopenfilenames()
         self.now = datetime.datetime.now()
@@ -1432,6 +1457,7 @@ class simpleapp_tk(Tk):
         for elem in self.fname:
             module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
             self.files_cosmcorr.append(elem)
+            self.Pop_Cosmcorr_tree(elem)
 
         self.read_all_fits(self.files_cosmcorr)
         print(self.images[0])
@@ -1545,6 +1571,7 @@ class simpleapp_tk(Tk):
         for elem in self.fname:
             module_logger_Preproc.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
             self.files_preproc.append(elem)
+            self.Pop_Prep_toproc_tree(elem)
 
         self.read_all_fits(self.files_preproc)
         print(self.images[0])
@@ -1586,12 +1613,39 @@ class simpleapp_tk(Tk):
             if self.tree_preproc_TOPROC.tag_has("checked", elem):
                 print(self.tree_preproc_TOPROC.item(elem)['text'])
                 files_to_use.append(self.tree_preproc_TOPROC.item(elem)['text']) 
-             
-        SP_Preproc.Preproc(files_to_use,self.MasterBiasName.get(),self.MasterFlatName.get(),False,'Procc',False)
-        
-#        os.system('python ' + Pipe_Path + '/SP_Preproc.py ' + " ".join(self.files_preproc) + ' -b ' + self.MasterBiasName.get() + ' -f ' + self.MasterFlatName.get())
-        self.now = datetime.datetime.now()
-        module_logger_Flat.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'End of flat processing' )
+#                self.Pop_bias_tree(elem)
+                
+        Hold = False
+        Children = self.tree_preproc_MBIAS.get_children()
+        Bias_to_use = []
+        Bias_Selected = False
+        for elem in Children:
+            if self.tree_preproc_MBIAS.tag_has("checked",elem):
+                if not Bias_Selected:
+                    Bias_to_use = self.tree_preproc_MBIAS.item(elem)['text']
+                    Bias_Selected = True
+                else:
+                    print('More than one Master bias selected!')
+                    Hold = True
+ 
+        Children = self.tree_preproc_MFLAT.get_children()
+        Flat_to_use = []
+        Flat_Selected = False
+        for elem in Children:
+            if self.tree_preproc_MFLAT.tag_has("checked",elem):
+                if not Flat_Selected:
+                    Flat_to_use = self.tree_preproc_MFLAT.item(elem)['text']
+                    Flat_Selected = True
+                else:
+                    print('More than one Master flat selected!')
+               
+                
+        if not Hold:
+            SP_Preproc.Preproc(files_to_use,Bias_to_use,Flat_to_use,False,'Procc',False)
+            
+    #        os.system('python ' + Pipe_Path + '/SP_Preproc.py ' + " ".join(self.files_preproc) + ' -b ' + self.MasterBiasName.get() + ' -f ' + self.MasterFlatName.get())
+            self.now = datetime.datetime.now()
+            module_logger_Flat.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'End of flat processing' )
         
         return None
 
@@ -1629,6 +1683,7 @@ class simpleapp_tk(Tk):
         for elem in self.fname:
             module_logger_Flat.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
             self.files_flat.append(elem)
+            self.Pop_flat_tree(elem)
 
         self.read_all_fits(self.files_flat)
         print(self.images[0])
@@ -1668,7 +1723,6 @@ class simpleapp_tk(Tk):
         Children = self.tree_flat.get_children()
         for elem in Children:
             if self.tree_flat.tag_has("checked", elem):
-                print(self.tree_flat.item(elem)['text'])
                 files_to_use.append(self.tree_flat.item(elem)['text'])        
         
         SP_Flat.Create_Flat(files_to_use,self.MasterFlatName_Flat.get(),True,self.MasterBiasName.get(),'none',False)
@@ -1723,14 +1777,11 @@ class simpleapp_tk(Tk):
         for elem in Children:
             self.tree_bias.change_state(elem, "checked")
 
-
- 
         self.menu_BiasFiles = StringVar(self.frame_fits)
         self.menu_BiasFiles.set(self.files_bias_name[0]) # default value   
         
         self.BiasFiles = OptionMenu(self.frame_fits, self.menu_BiasFiles, *self.files_bias_name)
         self.BiasFiles.pack()   
-        
         
         self.read_all_fits(self.files_bias)
         
@@ -1768,7 +1819,6 @@ class simpleapp_tk(Tk):
         Children = self.tree_bias.get_children()
         for elem in Children:
             if self.tree_bias.tag_has("checked", elem):
-                print(self.tree_bias.item(elem)['text'])
                 files_to_use.append(self.tree_bias.item(elem)['text'])
         
         
@@ -1787,16 +1837,19 @@ class simpleapp_tk(Tk):
         self.now = datetime.datetime.now()
         self.tree_prepare.delete(*self.tree_prepare.get_children())
         self.files_prepare=[]
+        
+        telescope, obsparam = CheckInstrument([self.fname[0]])
+        
         for elem in self.fname:
             header = fits.getheader(elem) # get the header without opening data
-            Type = header['IMAGETYP']
+            Type = header[obsparam['obstype']]
             ExpTime = header['EXPTIME']
             Date = header['DATE-OBS']
             Grat = header['GRATING']
-            GratAng = header['GRANGLE']
-            Target = header['SCITARG']
-            RotAng = header['IPA']
-            CollFoc = header['COLLFOC']
+            GratAng = header[obsparam['grat_ang']]
+            Target = header[obsparam['object']]
+            RotAng = header[obsparam['posangle']]
+            CollFoc = header[obsparam['focus']]
             self.Prepare_Tree = self.tree_prepare.insert("",
                                     'end',
                                     "",

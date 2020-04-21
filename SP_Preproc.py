@@ -11,6 +11,8 @@ import logging
 
 import SP_diagnostics as diag
 
+from astropy.io import fits
+
 
 def Preproc(filenames,MasterBias,MasterFlat,Verbose,Suffix,Diagnostic):
 
@@ -24,12 +26,28 @@ def Preproc(filenames,MasterBias,MasterFlat,Verbose,Suffix,Diagnostic):
     Object_in = []
     compteur = 0
     for elem in filenames:
-        compteur += 1
-        Object_out.append(elem.replace('.fits','') + '_' + Suffix)
-        Object_in.append(elem[:-5])
+        print(elem)
+        Header = fits.getheader(elem)
+        Prepared = False
+        try: 
+            Header['SP_PREPA']
+            if 'True' in Header['SP_PREPA']:
+                Prepared = True
+                print('True')
+            else:
+                Prepared = False
+        except:
+            Prepared = False
 
+        print(Header['SP_PREPA'])
+        
+        if Prepared:
+            compteur += 1
+            Object_out.append(elem.replace('.fits','') + '_' + Suffix)
+            Object_in.append(elem[:-5])
+        else: 
+            print('The fits ' + elem + ' has not been prepare, it will not be processed')
 
-    print(Object_in)
 
     ReducFlags = {'Bias': MasterBias, 
                       'Flat':MasterFlat,'OutFilelist': Object_out,'OverWrite':True, 'Verbose' : True, 'IsGMOS': False, 'RawPath':''}   

@@ -1216,6 +1216,13 @@ def Reduce(image_list,**kw):
             else:
                 hdulist = fits.open(toopen)
             red = (hdulist[0].data-MasterBias)/MasterFlat
+            for idx,elem in enumerate(red):
+                for idx2,elem2 in enumerate(elem):
+                    if elem2<0 or np.isnan(elem2):
+                        red[idx,idx2] = 0
+            hdulist[0].header['SP_PREPR'] = 'True'
+            hdulist[0].header['HISTORY'] = 'Bias corrected with ' +  kw['Bias']          
+            hdulist[0].header['HISTORY'] = 'Flat corrected with ' +  kw['Flat']   
             hdulist[0].data = red
             hdulist.writeto(ImageOut + '.fits',overwrite = OverWrite)
     else:
@@ -1226,6 +1233,13 @@ def Reduce(image_list,**kw):
             else:
                 hdulist = fits.open(toopen)
             red = (hdulist[0].data-MasterBias)/MasterFlat
+            for idx,elem in enumerate(red):
+                for idx2,elem2 in enumerate(elem):
+                    if elem2<0 or np.isnan(elem2) :
+                        red[idx,idx2] = 0            
+            hdulist[0].header['SP_PREPR'] = 'True'
+            hdulist[0].header['HISTORY'] = 'Bias corrected with ' +  kw['Bias']          
+            hdulist[0].header['HISTORY'] = 'Flat corrected with ' +  kw['Flat']               
             hdulist[0].data = red
             hdulist.writeto(ImageIn + Out_Suffix + '.fits',overwrite = OverWrite)
       
@@ -1985,6 +1999,11 @@ def Fit_Trace(hdulist,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **k
         p0 = [0,np.max(SS),2.24,1.41,Start[1]]
         
         coeffIn, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0, SClip = SClip)
+        
+        print(coeffIn)
+        if coeffIn[4] > 480 or coeffIn[4] < 20:
+            print('The detected spectrum is too close to the edge of the CCD')
+            raise ValueError('The detected spectrum is too close to the edge of the CCD')
 
         Trace[Start[0]] = float(coeffIn[4])
 
@@ -1996,7 +2015,7 @@ def Fit_Trace(hdulist,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **k
                 SS = np.median(data[xs,i-15:i+15],axis=1)
                 print("Extraction of the column {0:4}".format(str(i)), end='\r')
                 coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn, SClip = SClip)
-                if coeff[4] < 0 or coeff[4] > 2030:
+                if coeff[4] < 0 or coeff[4] > 480:
                     coeff = p0
                 MASK[i] = Mask
                 Trace[i] = float(coeff[4])
@@ -2013,11 +2032,12 @@ def Fit_Trace(hdulist,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **k
 
         p0 = coeffIn
         for i in range(Start[0],2030,1):
+            print(p0[4])
             xs = range(int(p0[4])-Range,int(p0[4])+Range)
             SS = np.median(data[xs,i-15:i+15],axis=1)
             print("Extraction of the column {0:4}".format(str(i)), end='\r')
             coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn,SClip = SClip)
-            if coeff[4] < 0 or coeff[4] > 2000:
+            if coeff[4] < 0 or coeff[4] > 480:
                 coeff = p0
             MASK[i] = Mask
             Trace[i] = float(coeff[4])

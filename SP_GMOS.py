@@ -13,6 +13,10 @@ from tkinter.filedialog import askopenfilenames
 from tkinter.messagebox import showerror
 from tkinter import messagebox
 
+from ttkwidgets import CheckboxTreeview
+
+from astropy.visualization import PercentileInterval, ZScaleInterval
+
 from astropy.io import fits
 
 import logging
@@ -21,15 +25,20 @@ import datetime
 import simplejson
 
 
+from collections import defaultdict
+
+
 from past.utils import old_div
 
 import operator
 
+import SP_Bias
+import SP_Preproc
 import SP_Prepare
+import SP_CosmCorr
 import SP_BckgSub
 import SP_Extract
 import SP_Combine
-import SP_Flat
 import SP_Flat
 import SP_Subtract
 import SP_DetectSpectra
@@ -40,6 +49,9 @@ from PIL import ImageDraw
 
 import argparse, shlex
 import numpy as np
+
+from glob import glob
+
 
 from scipy.ndimage import interpolation as interp
 
@@ -114,61 +126,79 @@ class simpleapp_tk(Tk):
 #        
         
         # Definition of the tab containing the different SP functions
-        
+  
+        self.tab_index= {}
+
+      
         self.TabControl = ttk.Notebook(self.frame_process)
         self.tab1 = Frame(self.TabControl)
         self.TabControl.add(self.tab1,text='Analysis')
+        self.tab_index.update({0:{'Name':'Analysis','Clicked':False}})
         
         # SP_Prepare tab
         self.tab_Prepare = Frame(self.TabControl)
         self.TabControl.add(self.tab_Prepare,text='Prepare')
+        self.tab_index.update({1:{'Name':'Prepare','Clicked':False}})
 
         # SP_Bias tab
         self.tab_Bias = Frame(self.TabControl)
         self.TabControl.add(self.tab_Bias,text='Bias')
+        self.tab_index.update({2:{'Name':'Bias','Clicked':False}})
 
         # SP_Flat tab
         self.tab_Flat = Frame(self.TabControl)
         self.TabControl.add(self.tab_Flat,text='Flat')
+        self.tab_index.update({3:{'Name':'Flat','Clicked':False}})
 
         # SP_Preproc tab
         self.tab_Preproc = Frame(self.TabControl)
         self.TabControl.add(self.tab_Preproc,text='Pre processing')
+        self.tab_index.update({4:{'Name':'Preproc','Clicked':False}})
 
         # SP_Cosmcorr tab
         self.tab_CosmCorr = Frame(self.TabControl)
         self.TabControl.add(self.tab_CosmCorr,text='Cosmic correction')
+        self.tab_index.update({5:{'Name':'Cosmcorr','Clicked':False}})
 
 
         # SP_DetectSpectra tab
         self.tab_DetectSpectra = Frame(self.TabControl)
         self.TabControl.add(self.tab_DetectSpectra,text='Detect spectra')
+        self.tab_index.update({6:{'Name':'DetectSpectra','Clicked':False}})
 
 
         # SP_Subtract tab
         self.tab_Subtract = Frame(self.TabControl)
         self.TabControl.add(self.tab_Subtract,text='Image subtraction')
+        self.tab_index.update({6:{'Name':'Bckgsub','Clicked':False}})
 
         # SP_BckgSub tab
         self.tab_BckgSub = Frame(self.TabControl)
         self.TabControl.add(self.tab_BckgSub,text='Background subtraction')
+        self.tab_index.update({7:{'Name':'Bckgsub','Clicked':False}})
 
         # SP_Extract tab
         self.tab_Extract = Frame(self.TabControl)
         self.TabControl.add(self.tab_Extract,text='Spectra extraction')        
+        self.tab_index.update({8:{'Name':'Extract','Clicked':False}})
 
         # SP_Combine tab
         self.tab_Combine = Frame(self.TabControl)
         self.TabControl.add(self.tab_Combine,text='Combine spectra')
         self.TabControl.bind(self.tab_Combine,"<ButtonRelease-1>", self.load_file)    
+        self.tab_index.update({9:{'Name':'Combine','Clicked':False}})
 
         # SP_WavCal tab
         self.tab_WavCal = Frame(self.TabControl)
         self.TabControl.add(self.tab_WavCal,text='Wavelength calibration')   
+        self.tab_index.update({10:{'Name':'Wavcal','Clicked':False}})
 
         # SP_TellCorr tab
         self.tab_TellCorr = Frame(self.TabControl)
         self.TabControl.add(self.tab_TellCorr,text='Telluric correction')   
+        self.tab_index.update({11:{'Name':'TellCorr','Clicked':False}})
+        
+        
         
         self.TabControl.pack(expand=1, fill="both") 
         
@@ -277,145 +307,504 @@ class simpleapp_tk(Tk):
                 self.canvas.pack()
                 self.image = self.canvas.create_image(0, 0, anchor='nw',
                                               image=self.tkimage)  
+                
+                
+        # Action to be performed when BIAS tab is clicked for the first time 
+        if self.tab_index[int(tab)]['Name'] == 'Bias' and self.tab_index[int(tab)]['Clicked'] == False:
+            self.files_bias_name = glob('*Bias*fits')
+            for elem in self.files_bias_name:
+                self.Pop_bias_tree(elem)
+                
+            Children = self.tree_bias.get_children()
+            for elem in Children:
+                self.tree_bias.change_state(elem, "checked")
+
+            self.files_bias = []
+            for elem in self.files_bias_name:
+                self.files_bias.append(self.cdw + '/' + elem)                
+        
+        # Action to be performed when FLAT tab is clicked for the first time 
+        if self.tab_index[int(tab)]['Name'] == 'Flat' and self.tab_index[int(tab)]['Clicked'] == False:
+            self.files_flat_name = glob('*GCALflat*fits')
+
+            for elem in self.files_flat_name:
+                self.Pop_flat_tree(elem)
+               
+            Children = self.tree_flat.get_children()
+            for elem in Children:
+                self.tree_flat.change_state(elem, "checked")
+
+            self.files_flat = []
+            for elem in self.files_flat_name:
+                self.files_flat.append(self.cdw + '/' + elem)
 
 
+        # Action to be performed when Preproc tab is clicked for the first time 
+        if self.tab_index[int(tab)]['Name'] == 'Preproc' and self.tab_index[int(tab)]['Clicked'] == False:
+            print('First time clicked')
+            self.files_pre_name = glob('*fits')
+            Biases = []
+            Flats = []
+            ToProc = []
+            Obj = []
+            Object = {}
+            Wavel = []
+            
+            Object = defaultdict(list)
+
+            for elem in self.files_pre_name:
+                header = fits.getheader(elem)
+                
+                try: 
+                    if header['PROCTYPE'] == 'MASTER FLAT':
+                        Flats.append(elem)
+                    if header['PROCTYPE'] == 'MASTER BIAS':
+                        Biases.append(elem)
+                    if header['OBSTYPE'] == 'OBJECT' and header['PROCTYPE'] == 'Prepared':
+                        Wavelength = header['WAVELENG']
+                        ToProc.append(elem)
+                        Object[header['Object']+'_'+str(int(Wavelength)/10)].append(elem)
+                                     
+                except:
+                    pass
 
 
+            for elem in Biases:
+                self.Pop_Prep_bias_tree(elem)
+
+            Children = self.tree_preproc_MBIAS.get_children()
+            self.tree_preproc_MBIAS.change_state(Children[0], "checked")
+
+            
+            for elem in Flats:
+                self.Pop_Prep_flat_tree(elem)
+
+            Children = self.tree_preproc_MFLAT.get_children()
+            self.tree_preproc_MFLAT.change_state(Children[0], "checked")
+
+            for elem in Object:
+                self.Create_Folder_toproc_tree(Object[elem],elem)
+
+
+        if self.tab_index[int(tab)]['Name'] == 'Cosmcorr' and self.tab_index[int(tab)]['Clicked'] == False:
+            print('First time clicked')
+            self.files_cosm_name = glob('*fits')
+#            Biases = []
+#            Flats = []
+#            ToProc = []
+#            Obj = []
+#            Object = {}
+#            Wavel = []
+#            
+#            Object = defaultdict(list)
+
+            for elem in self.files_cosm_name:
+                header = fits.getheader(elem)
+                try: 
+                    if 'True' in header['SP_PREPR']:
+                        print(elem)
+                        self.Pop_Cosmcorr_tree(elem)
+                except:
+                    pass
+
+            Children = self.tree_CosmCorr.get_children()
+            for elem in Children:
+                self.tree_CosmCorr.change_state(elem, "checked")
+
+            
         self.lastindex = event.widget.index("current")       
 
 
     def Prepare_GUI(self):
         
-        self.Prepare_load_button = Button(self.tab_Prepare, text="Load files", width=20)
+#        self.Prepare_load_button = Button(self.tab_Prepare, text="Load files", width=20)
+#        self.Prepare_load_button.grid(row=0, column=0, sticky=W)  
+#        self.Prepare_load_button.bind("<ButtonRelease-1>", self.load_file_prepare)    
+# 
+#        self.Prepare_run_button = Button(self.tab_Prepare, text="Run prepare", width=20)
+#        self.Prepare_run_button.grid(row=1, column=0, sticky=W)  
+#        self.Prepare_run_button.bind("<ButtonRelease-1>", self.Prepare)   
+#       
+#        self.frame_Prepare=Frame(self.tab_Prepare, width=1000, height=self.Process_Height)
+#        self.frame_Prepare.grid(column=2, row=0,rowspan=25,columnspan=10)
+#
+#        self.frame_Prepare.grid_propagate(False)
+#
+#        self.frame_Prepare.grid_rowconfigure(0, weight=1)
+#        self.frame_Prepare.grid_columnconfigure(0, weight=1)
+#
+#        self.frame_Prepare.mytext3 = Text(self.frame_Prepare, state="disabled")
+#        self.frame_Prepare.mytext3.place(x=10, y=10, height=990, width=390)       
+
+
+        self.frame_Prepare_Button=Frame(self.tab_Prepare, width=100, height=400)
+        self.frame_Prepare_Button.grid(column=0, row=0)
+
+        self.Prepare_load_button = Button(self.frame_Prepare_Button, text="Load files", width=20)
         self.Prepare_load_button.grid(row=0, column=0, sticky=W)  
         self.Prepare_load_button.bind("<ButtonRelease-1>", self.load_file_prepare)    
  
-        self.Prepare_run_button = Button(self.tab_Prepare, text="Run prepare", width=20)
+        self.Prepare_run_button = Button(self.frame_Prepare_Button, text="Run prepare", width=20)
         self.Prepare_run_button.grid(row=1, column=0, sticky=W)  
         self.Prepare_run_button.bind("<ButtonRelease-1>", self.Prepare)   
        
-        self.frame_Prepare=Frame(self.tab_Prepare, width=1000, height=self.Process_Height)
-        self.frame_Prepare.grid(column=2, row=0,rowspan=25,columnspan=10)
+        self.frame_Prepare=Frame(self.tab_Prepare, width=900, height=1000)
+        self.frame_Prepare.grid(column=1, row=0)
 
-        self.frame_Prepare.grid_propagate(False)
 
-        self.frame_Prepare.grid_rowconfigure(0, weight=1)
-        self.frame_Prepare.grid_columnconfigure(0, weight=1)
 
-        self.frame_Prepare.mytext3 = Text(self.frame_Prepare, state="disabled")
-        self.frame_Prepare.mytext3.place(x=10, y=10, height=990, width=390)       
+
+        self.tree_prepare = CheckboxTreeview(self.frame_Prepare)
+        self.tree_prepare["columns"]=("Type","ExpTime","Date","Grating","GratAng","Target","RotAng")
+        self.tree_prepare.column("#0", width=250)
+        self.tree_prepare.column("Type", width=100)
+        self.tree_prepare.column("ExpTime", width=100)
+        self.tree_prepare.column("Date", width=100)
+        self.tree_prepare.column("Grating", width=100)
+        self.tree_prepare.column("GratAng", width=100)
+        self.tree_prepare.column("Target", width=100)
+        self.tree_prepare.column("RotAng", width=100)
+        
+        self.tree_prepare.heading("#0",text="File name",anchor=W)
+        self.tree_prepare.heading("Type",text="Type",anchor=CENTER)
+        self.tree_prepare.heading("ExpTime", text="Exp time",anchor=CENTER)
+        self.tree_prepare.heading("Date", text="Date",anchor=W)
+        self.tree_prepare.heading("Grating", text="Grating",anchor=W)
+        self.tree_prepare.heading("GratAng", text="Grat. ang.",anchor=W)        
+        self.tree_prepare.heading("Target", text="Target",anchor=W)   
+        self.tree_prepare.heading("RotAng", text="Rot. ang.",anchor=W)   
+        
+        self.tree_prepare.grid(column=1,row = 0)
+
+
+
+
+
+
         
     def Bias_GUI(self):
         
-        self.Bias_load_button = Button(self.tab_Bias, text="Load files", width=20)
-        self.Bias_load_button.grid(row=0, column=0, sticky=W)  
-        self.Bias_load_button.bind("<ButtonRelease-1>", self.load_file_bias)    
- 
-        self.Bias_run_button = Button(self.tab_Bias, text="Create Master Bias", width=20)
-        self.Bias_run_button.grid(row=1, column=0, sticky=W)  
+
+        self.Frame_Bias_Button = Frame(self.tab_Bias, width=200, height=400)
+        self.Frame_Bias_Button.grid(row = 0,column =0)
+        
+        self.Frame_Bias_Info = Frame(self.tab_Bias, width=800, height=400)
+        self.Frame_Bias_Info.grid(row = 0,column =1)
+        
+        Row_0_Bias = 0
+        
+        self.Bias_load_button = Button(self.Frame_Bias_Button, text="Load files", width=20)
+        self.Bias_load_button.grid(row=Row_0_Bias, column=0, sticky=W)  
+        self.Bias_load_button.bind("<ButtonRelease-1>", self.load_file_bias)   
+        
+        Row_0_Bias +=1
+
+    
+        self.menu_BiasCombine = StringVar(self.Frame_Bias_Button)
+        self.menu_BiasCombine.set("Median") # default value   
+        
+        Label(self.Frame_Bias_Button, text='Method: ').grid(row=Row_0_Bias,column = 0)
+        self.Bias_Method = OptionMenu(self.Frame_Bias_Button, self.menu_BiasCombine, "Median", "Mean")
+        self.Bias_Method.grid(column=Row_0_Bias, row=1, sticky=W)
+        
+        
+        Row_0_Bias +=1 
+    
+        self.Bias_run_button = Button(self.Frame_Bias_Button, text="Create Master Bias", width=20)
+        self.Bias_run_button.grid(row=Row_0_Bias, column=0, sticky=W)  
         self.Bias_run_button.bind("<ButtonRelease-1>", self.Bias)   
        
-        self.frame_Bias=Frame(self.tab_Bias, width=1000, height=self.Process_Height)
-        self.frame_Bias.grid(column=2, row=0,rowspan=25,columnspan=10)
+        Row_0_Bias +=1
 
-        self.frame_Bias.grid_propagate(False)
+        Label(self.Frame_Bias_Button, text='Master bias name:').grid(row=Row_0_Bias,column = 0)
+        self.MasterBiasName_Bias = Entry(self.Frame_Bias_Button) 
+        self.MasterBiasName_Bias.grid(row=Row_0_Bias, column=1) 
+        self.MasterBiasName_Bias.insert(END,'MasterBias.fits')
 
-        self.frame_Bias.grid_rowconfigure(0, weight=1)
-        self.frame_Bias.grid_columnconfigure(0, weight=1)
-
-        self.frame_Bias.mytext_Bias = Text(self.frame_Bias, state="disabled")
-        self.frame_Bias.mytext_Bias.place(x=10, y=10, height=990, width=390)               
-
-        Label(self.tab_Bias, text='Master bias name:').grid(row=3,column = 0)
-        self.MasterBiasName = Entry(self.tab_Bias) 
-        self.MasterBiasName.grid(row=3, column=1) 
-        self.MasterBiasName.insert(END,'MasterBias.fits')
+       
+        
+        self.tree_bias = CheckboxTreeview(self.Frame_Bias_Info)
+        self.tree_bias["columns"]=("Type","ExpTime","Mean","Median","std","Date")
+        self.tree_bias.column("#0", width=400)
+        self.tree_bias.column("Type", width=50)
+        self.tree_bias.column("ExpTime", width=50)
+        self.tree_bias.column("Mean", width=70)
+        self.tree_bias.column("Median", width=70)
+        self.tree_bias.column("std", width=70)
+        self.tree_bias.column("Date", width=200)
+        
+        self.tree_bias.heading("#0",text="File name",anchor=W)
+        self.tree_bias.heading("Type",text="Type",anchor=CENTER)
+        self.tree_bias.heading("ExpTime", text="Exp time",anchor=CENTER)
+        self.tree_bias.heading("Mean", text="Mean",anchor=CENTER)
+        self.tree_bias.heading("Median", text="Median",anchor=CENTER)
+        self.tree_bias.heading("std", text="std",anchor=CENTER)
+        self.tree_bias.heading("Date", text="Date",anchor=W)
+        
+        self.tree_bias.grid(column=1,row = 0)          
+        
+        
+        
+        
+        
         
     def Flat_GUI(self):
         
-        self.Flat_load_button = Button(self.tab_Flat, text="Load files", width=20)
+#        self.Flat_load_button = Button(self.tab_Flat, text="Load files", width=20)
+#        self.Flat_load_button.grid(row=0, column=0, sticky=W)  
+#        self.Flat_load_button.bind("<ButtonRelease-1>", self.load_file_flat)    
+# 
+#        self.Flat_run_button = Button(self.tab_Flat, text="Create Master Flat", width=20)
+#        self.Flat_run_button.grid(row=1, column=0, sticky=W)  
+#        self.Flat_run_button.bind("<ButtonRelease-1>", self.Flat)   
+#       
+#        self.frame_Flat=Frame(self.tab_Flat, width=1000, height=self.Process_Height)
+#        self.frame_Flat.grid(column=2, row=0,rowspan=25,columnspan=10)
+#
+#        self.frame_Flat.grid_propagate(False)
+#
+#        self.frame_Flat.grid_rowconfigure(0, weight=1)
+#        self.frame_Flat.grid_columnconfigure(0, weight=1)
+#
+#        self.frame_Flat.mytext_Flat = Text(self.frame_Flat, state="disabled")
+#        self.frame_Flat.mytext_Flat.place(x=10, y=10, height=990, width=390)               
+#
+#        Label(self.tab_Flat, text='Master flat name:').grid(row=4,column = 0)
+#        self.MasterFlatName_Flat = Entry(self.tab_Flat) 
+#        self.MasterFlatName_Flat.grid(row=4, column=1) 
+#        self.MasterFlatName_Flat.insert(END,'MasterFlat.fits')
+#
+#        Label(self.tab_Flat, text='Master bias name:').grid(row=3,column = 0)
+#        self.MasterBiasName_Flat = Entry(self.tab_Flat) 
+#        self.MasterBiasName_Flat.grid(row=3, column=1) 
+#        self.MasterBiasName_Flat.insert(END,'MasterBias.fits')
+        
+        self.Frame_Flat_Button = Frame(self.tab_Flat, width=200, height=400)
+        self.Frame_Flat_Button.grid(row = 0,column =0)
+        
+        self.Frame_Flat_Info = Frame(self.tab_Flat, width=800, height=400)
+        self.Frame_Flat_Info.grid(row = 0,column =1)        
+        
+        
+        self.Flat_load_button = Button(self.Frame_Flat_Button, text="Load files", width=20)
         self.Flat_load_button.grid(row=0, column=0, sticky=W)  
         self.Flat_load_button.bind("<ButtonRelease-1>", self.load_file_flat)    
  
-        self.Flat_run_button = Button(self.tab_Flat, text="Create Master Flat", width=20)
+        self.Flat_run_button = Button(self.Frame_Flat_Button, text="Create Master Flat", width=20)
         self.Flat_run_button.grid(row=1, column=0, sticky=W)  
         self.Flat_run_button.bind("<ButtonRelease-1>", self.Flat)   
-       
-        self.frame_Flat=Frame(self.tab_Flat, width=1000, height=self.Process_Height)
-        self.frame_Flat.grid(column=2, row=0,rowspan=25,columnspan=10)
+                     
 
-        self.frame_Flat.grid_propagate(False)
-
-        self.frame_Flat.grid_rowconfigure(0, weight=1)
-        self.frame_Flat.grid_columnconfigure(0, weight=1)
-
-        self.frame_Flat.mytext_Flat = Text(self.frame_Flat, state="disabled")
-        self.frame_Flat.mytext_Flat.place(x=10, y=10, height=990, width=390)               
-
-        Label(self.tab_Flat, text='Master flat name:').grid(row=4,column = 0)
-        self.MasterFlatName_Flat = Entry(self.tab_Flat) 
+        Label(self.Frame_Flat_Button, text='Master flat name:').grid(row=4,column = 0)
+        self.MasterFlatName_Flat = Entry(self.Frame_Flat_Button) 
         self.MasterFlatName_Flat.grid(row=4, column=1) 
         self.MasterFlatName_Flat.insert(END,'MasterFlat.fits')
 
-        Label(self.tab_Flat, text='Master bias name:').grid(row=3,column = 0)
-        self.MasterBiasName_Flat = Entry(self.tab_Flat) 
-        self.MasterBiasName_Flat.grid(row=3, column=1) 
-        self.MasterBiasName_Flat.insert(END,'MasterBias.fits')
+        Label(self.Frame_Flat_Button, text='Master bias name:').grid(row=3,column = 0)
+        self.MasterBiasName = Entry(self.Frame_Flat_Button) 
+        self.MasterBiasName.grid(row=3, column=1) 
+        self.MasterBiasName.insert(END,'MasterBias.fits')        
+        
+        
+        self.tree_flat = CheckboxTreeview(self.Frame_Flat_Info)
+        self.tree_flat["columns"]=("Type","ExpTime","Mean","Median","std","Date")
+        self.tree_flat.column("#0", width=400)
+        self.tree_flat.column("Type", width=50)
+        self.tree_flat.column("ExpTime", width=50)
+        self.tree_flat.column("Mean", width=70)
+        self.tree_flat.column("Median", width=70)
+        self.tree_flat.column("std", width=70)
+        self.tree_flat.column("Date", width=200)
+        
+        self.tree_flat.heading("#0",text="File name",anchor=W)
+        self.tree_flat.heading("Type",text="Type",anchor=CENTER)
+        self.tree_flat.heading("ExpTime", text="Exp time",anchor=CENTER)
+        self.tree_flat.heading("Mean", text="Mean",anchor=CENTER)
+        self.tree_flat.heading("Median", text="Median",anchor=CENTER)
+        self.tree_flat.heading("std", text="std",anchor=CENTER)
+        self.tree_flat.heading("Date", text="Date",anchor=W)
+
+        self.tree_flat.grid(column=1,row = 0)   
 
 
     def Preproc_GUI(self):
         
-        self.Preproc_load_button = Button(self.tab_Preproc, text="Load files", width=20)
+#        self.Preproc_load_button = Button(self.tab_Preproc, text="Load files", width=20)
+#        self.Preproc_load_button.grid(row=0, column=0, sticky=W)  
+#        self.Preproc_load_button.bind("<ButtonRelease-1>", self.load_file_preproc)    
+# 
+#        self.Preproc_run_button = Button(self.tab_Preproc, text="Process files", width=20)
+#        self.Preproc_run_button.grid(row=1, column=0, sticky=W)  
+#        self.Preproc_run_button.bind("<ButtonRelease-1>", self.Preproc)   
+#       
+#        self.frame_Preproc=Frame(self.tab_Preproc, width=1000, height=self.Process_Height)
+#        self.frame_Preproc.grid(column=2, row=0,rowspan=25,columnspan=10)
+#
+#        self.frame_Preproc.grid_propagate(False)
+#
+#        self.frame_Preproc.grid_rowconfigure(0, weight=1)
+#        self.frame_Preproc.grid_columnconfigure(0, weight=1)
+#
+#        self.frame_Preproc.mytext_Preproc = Text(self.frame_Preproc, state="disabled")
+#        self.frame_Preproc.mytext_Preproc.place(x=10, y=10, height=990, width=390)               
+#
+#        Label(self.tab_Preproc, text='Master flat name:').grid(row=4,column = 0)
+#        self.MasterFlatName = Entry(self.tab_Preproc) 
+#        self.MasterFlatName.grid(row=4, column=1) 
+#        self.MasterFlatName.insert(END,'MasterFlat.fits')
+#
+#        Label(self.tab_Preproc, text='Master bias name:').grid(row=3,column = 0)
+#        self.MasterBiasName = Entry(self.tab_Preproc) 
+#        self.MasterBiasName.grid(row=3, column=1) 
+#        self.MasterBiasName.insert(END,'MasterBias.fits')
+
+
+        self.Frame_Preproc_Button = Frame(self.tab_Preproc, width=200, height=400)
+        self.Frame_Preproc_Button.grid(row = 0,column =0)
+        
+        self.Frame_Preproc_Info = Frame(self.tab_Preproc, width=800, height=400)
+        self.Frame_Preproc_Info.grid(row = 0,column =1)  
+
+        
+        self.Preproc_load_button = Button(self.Frame_Preproc_Button, text="Load files", width=20)
         self.Preproc_load_button.grid(row=0, column=0, sticky=W)  
         self.Preproc_load_button.bind("<ButtonRelease-1>", self.load_file_preproc)    
  
-        self.Preproc_run_button = Button(self.tab_Preproc, text="Process files", width=20)
+        self.Preproc_run_button = Button(self.Frame_Preproc_Button, text="Process files", width=20)
         self.Preproc_run_button.grid(row=1, column=0, sticky=W)  
         self.Preproc_run_button.bind("<ButtonRelease-1>", self.Preproc)   
        
-        self.frame_Preproc=Frame(self.tab_Preproc, width=1000, height=self.Process_Height)
-        self.frame_Preproc.grid(column=2, row=0,rowspan=25,columnspan=10)
-
-        self.frame_Preproc.grid_propagate(False)
-
-        self.frame_Preproc.grid_rowconfigure(0, weight=1)
-        self.frame_Preproc.grid_columnconfigure(0, weight=1)
-
-        self.frame_Preproc.mytext_Preproc = Text(self.frame_Preproc, state="disabled")
-        self.frame_Preproc.mytext_Preproc.place(x=10, y=10, height=990, width=390)               
-
-        Label(self.tab_Preproc, text='Master flat name:').grid(row=4,column = 0)
-        self.MasterFlatName = Entry(self.tab_Preproc) 
+        Label(self.Frame_Preproc_Button, text='Master flat name:').grid(row=4,column = 0)
+        self.MasterFlatName = Entry(self.Frame_Preproc_Button) 
         self.MasterFlatName.grid(row=4, column=1) 
         self.MasterFlatName.insert(END,'MasterFlat.fits')
 
-        Label(self.tab_Preproc, text='Master bias name:').grid(row=3,column = 0)
-        self.MasterBiasName = Entry(self.tab_Preproc) 
+        Label(self.Frame_Preproc_Button, text='Master bias name:').grid(row=3,column = 0)
+        self.MasterBiasName = Entry(self.Frame_Preproc_Button) 
         self.MasterBiasName.grid(row=3, column=1) 
         self.MasterBiasName.insert(END,'MasterBias.fits')
 
 
+
+        self.tree_preproc_MBIAS = CheckboxTreeview(self.Frame_Preproc_Info, height =3)
+        self.tree_preproc_MBIAS["columns"]=("Type","ExpTime","Mean","Median","std","Date")
+        self.tree_preproc_MBIAS.column("#0", width=400)
+        self.tree_preproc_MBIAS.column("Type", width=50)
+        self.tree_preproc_MBIAS.column("ExpTime", width=50)
+        self.tree_preproc_MBIAS.column("Mean", width=70)
+        self.tree_preproc_MBIAS.column("Median", width=70)
+        self.tree_preproc_MBIAS.column("std", width=70)
+        self.tree_preproc_MBIAS.column("Date", width=200)
+        
+        self.tree_preproc_MBIAS.heading("#0",text="File name",anchor=W)
+        self.tree_preproc_MBIAS.heading("Type",text="Type",anchor=CENTER)
+        self.tree_preproc_MBIAS.heading("ExpTime", text="Exp time",anchor=CENTER)
+        self.tree_preproc_MBIAS.heading("Mean", text="Mean",anchor=CENTER)
+        self.tree_preproc_MBIAS.heading("Median", text="Median",anchor=CENTER)
+        self.tree_preproc_MBIAS.heading("std", text="std",anchor=CENTER)
+        self.tree_preproc_MBIAS.heading("Date", text="Date",anchor=W)
+        
+        self.tree_preproc_MBIAS.grid(column=1,row = 0)    
+
+        self.tree_preproc_MFLAT = CheckboxTreeview(self.Frame_Preproc_Info, height =3)
+        self.tree_preproc_MFLAT["columns"]=("Type","ExpTime","Mean","Median","std","Date")
+        self.tree_preproc_MFLAT.column("#0", width=400)
+        self.tree_preproc_MFLAT.column("Type", width=50)
+        self.tree_preproc_MFLAT.column("ExpTime", width=50)
+        self.tree_preproc_MFLAT.column("Mean", width=70)
+        self.tree_preproc_MFLAT.column("Median", width=70)
+        self.tree_preproc_MFLAT.column("std", width=70)
+        self.tree_preproc_MFLAT.column("Date", width=200)
+        
+        self.tree_preproc_MFLAT.heading("#0",text="File name",anchor=W)
+        self.tree_preproc_MFLAT.heading("Type",text="Type",anchor=CENTER)
+        self.tree_preproc_MFLAT.heading("ExpTime", text="Exp time",anchor=CENTER)
+        self.tree_preproc_MFLAT.heading("Mean", text="Mean",anchor=CENTER)
+        self.tree_preproc_MFLAT.heading("Median", text="Median",anchor=CENTER)
+        self.tree_preproc_MFLAT.heading("std", text="std",anchor=CENTER)
+        self.tree_preproc_MFLAT.heading("Date", text="Date",anchor=W)
+        
+        self.tree_preproc_MFLAT.grid(column=1,row = 1)    
+
+        self.tree_preproc_TOPROC = CheckboxTreeview(self.Frame_Preproc_Info, height = 10)
+        self.tree_preproc_TOPROC["columns"]=("Type","ExpTime","Mean","Median","std","Date")
+        self.tree_preproc_TOPROC.column("#0", width=400)
+        self.tree_preproc_TOPROC.column("Type", width=50)
+        self.tree_preproc_TOPROC.column("ExpTime", width=50)
+        self.tree_preproc_TOPROC.column("Mean", width=70)
+        self.tree_preproc_TOPROC.column("Median", width=70)
+        self.tree_preproc_TOPROC.column("std", width=70)
+        self.tree_preproc_TOPROC.column("Date", width=200)
+        
+        self.tree_preproc_TOPROC.heading("#0",text="File name",anchor=W)
+        self.tree_preproc_TOPROC.heading("Type",text="Type",anchor=CENTER)
+        self.tree_preproc_TOPROC.heading("ExpTime", text="Exp time",anchor=CENTER)
+        self.tree_preproc_TOPROC.heading("Mean", text="Mean",anchor=CENTER)
+        self.tree_preproc_TOPROC.heading("Median", text="Median",anchor=CENTER)
+        self.tree_preproc_TOPROC.heading("std", text="std",anchor=CENTER)
+        self.tree_preproc_TOPROC.heading("Date", text="Date",anchor=W)
+        
+        self.tree_preproc_TOPROC.grid(column=1,row = 2)    
+
+
+
     def CosmCorr_GUI(self):
         
-        self.CosmCorr_load_button = Button(self.tab_CosmCorr, text="Load files", width=20)
+#        self.CosmCorr_load_button = Button(self.tab_CosmCorr, text="Load files", width=20)
+#        self.CosmCorr_load_button.grid(row=0, column=0, sticky=W)  
+#        self.CosmCorr_load_button.bind("<ButtonRelease-1>", self.load_file_cosmcorr)    
+# 
+#        self.CosmCorr_run_button = Button(self.tab_CosmCorr, text="Correct cosmics", width=20)
+#        self.CosmCorr_run_button.grid(row=1, column=0, sticky=W)  
+#        self.CosmCorr_run_button.bind("<ButtonRelease-1>", self.Cosmcorr)   
+#       
+#        self.frame_CosmCorr=Frame(self.tab_CosmCorr, width=1000, height=self.Process_Height)
+#        self.frame_CosmCorr.grid(column=2, row=0,rowspan=25,columnspan=10)
+#
+#        self.frame_CosmCorr.grid_propagate(False)
+#
+#        self.frame_CosmCorr.grid_rowconfigure(0, weight=1)
+#        self.frame_CosmCorr.grid_columnconfigure(0, weight=1)
+#
+#        self.frame_CosmCorr.mytext_Cosmcorr = Text(self.frame_CosmCorr, state="disabled")
+#        self.frame_CosmCorr.mytext_Cosmcorr.place(x=10, y=10, height=990, width=390)   
+
+        self.Frame_CosmCorr_Button = Frame(self.tab_CosmCorr, width=200, height=400)
+        self.Frame_CosmCorr_Button.grid(row = 0,column =0)
+        
+        self.Frame_CosmCorr_Info = Frame(self.tab_CosmCorr, width=800, height=400)
+        self.Frame_CosmCorr_Info.grid(row = 0,column =1)          
+        
+        
+        self.CosmCorr_load_button = Button(self.Frame_CosmCorr_Button, text="Load files", width=20)
         self.CosmCorr_load_button.grid(row=0, column=0, sticky=W)  
         self.CosmCorr_load_button.bind("<ButtonRelease-1>", self.load_file_cosmcorr)    
  
-        self.CosmCorr_run_button = Button(self.tab_CosmCorr, text="Correct cosmics", width=20)
+        self.CosmCorr_run_button = Button(self.Frame_CosmCorr_Button, text="Correct cosmics", width=20)
         self.CosmCorr_run_button.grid(row=1, column=0, sticky=W)  
         self.CosmCorr_run_button.bind("<ButtonRelease-1>", self.Cosmcorr)   
-       
-        self.frame_CosmCorr=Frame(self.tab_CosmCorr, width=1000, height=self.Process_Height)
-        self.frame_CosmCorr.grid(column=2, row=0,rowspan=25,columnspan=10)
 
-        self.frame_CosmCorr.grid_propagate(False)
-
-        self.frame_CosmCorr.grid_rowconfigure(0, weight=1)
-        self.frame_CosmCorr.grid_columnconfigure(0, weight=1)
-
-        self.frame_CosmCorr.mytext_Cosmcorr = Text(self.frame_CosmCorr, state="disabled")
-        self.frame_CosmCorr.mytext_Cosmcorr.place(x=10, y=10, height=990, width=390)   
-
+        self.tree_CosmCorr = CheckboxTreeview(self.Frame_CosmCorr_Info)
+        self.tree_CosmCorr["columns"]=("Type","ExpTime","Mean","Median","std","Date")
+        self.tree_CosmCorr.column("#0", width=400)
+        self.tree_CosmCorr.column("Type", width=50)
+        self.tree_CosmCorr.column("ExpTime", width=50)
+        self.tree_CosmCorr.column("Mean", width=70)
+        self.tree_CosmCorr.column("Median", width=70)
+        self.tree_CosmCorr.column("std", width=70)
+        self.tree_CosmCorr.column("Date", width=200)
+        
+        self.tree_CosmCorr.heading("#0",text="File name",anchor=W)
+        self.tree_CosmCorr.heading("Type",text="Type",anchor=CENTER)
+        self.tree_CosmCorr.heading("ExpTime", text="Exp time",anchor=CENTER)
+        self.tree_CosmCorr.heading("Mean", text="Mean",anchor=CENTER)
+        self.tree_CosmCorr.heading("Median", text="Median",anchor=CENTER)
+        self.tree_CosmCorr.heading("std", text="std",anchor=CENTER)
+        self.tree_CosmCorr.heading("Date", text="Date",anchor=W)
+        
+        self.tree_CosmCorr.grid(column=1,row = 0)            
+        
+        
 
     def DetectSpectra_GUI(self):
         
@@ -1351,6 +1740,26 @@ class simpleapp_tk(Tk):
 ##############################################################################
 
 
+    def Pop_Cosmcorr_tree(self,elem):
+        hdulist = fits.open(elem)
+        ExpTime = hdulist[0].header['EXPTIME']
+        Type = hdulist[0].header['OBSTYPE']
+        Date = hdulist[0].header['DATE-OBS']
+        Mean = np.mean(hdulist[0].data)
+        Median = np.median(hdulist[0].data)
+        Std = np.std(hdulist[0].data)
+        self.CosmCorr_Tree = self.tree_CosmCorr.insert("",
+                                    'end',
+                                    "",
+                                    text= elem.split('/')[-1],
+                                    values=(Type,
+                                            str(ExpTime),
+                                            str("{0:.1f}".format(Mean)),
+                                            str("{0:.0f}".format(Median)),
+                                            str("{0:.1f}".format(Std)),
+                                            Date))
+
+
     def load_file_cosmcorr(self, event):
         self.fname = askopenfilenames()
         self.now = datetime.datetime.now()
@@ -1358,6 +1767,7 @@ class simpleapp_tk(Tk):
         for elem in self.fname:
             module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
             self.files_cosmcorr.append(elem)
+            self.Pop_Cosmcorr_tree(elem)
 
         self.read_all_fits(self.files_cosmcorr)
         print(self.images[0])
@@ -1389,9 +1799,20 @@ class simpleapp_tk(Tk):
         return None
 
     def Cosmcorr(self, event):
+
+
         now = datetime.datetime.now()
         module_logger.info(now)
-        os.system('python ' + Pipe_Path + '/SP_CosmCorr.py ' + " ".join(self.files_cosmcorr))
+        
+        files_to_use = []
+        Children = self.tree_CosmCorr.get_children()
+        for elem in Children:
+            if self.tree_CosmCorr.tag_has("checked", elem):
+                files_to_use.append(self.tree_CosmCorr.item(elem)['text'])        
+        
+        SP_CosmCorr.Cosmic(files_to_use,False)
+        
+#        os.system('python ' + Pipe_Path + '/SP_CosmCorr.py ' + " ".join(self.files_cosmcorr))
         self.now = datetime.datetime.now()
         module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
         
@@ -1400,6 +1821,91 @@ class simpleapp_tk(Tk):
 ############################################################################## 
 # SP_Preproc
 ##############################################################################
+
+    def Pop_Prep_bias_tree(self,elem):
+        hdulist = fits.open(elem)
+        ExpTime = hdulist[0].header['EXPTIME']
+        Type = hdulist[0].header['OBSTYPE']
+        Date = hdulist[0].header['DATE-OBS']
+        Mean = np.mean(hdulist[0].data)
+        Median = np.median(hdulist[0].data)
+        Std = np.std(hdulist[0].data)
+        self.Bias_Tree = self.tree_preproc_MBIAS.insert("",
+                                    'end',
+                                    "",
+                                    text= elem.split('/')[-1],
+                                    values=(Type,
+                                            str(ExpTime),
+                                            str("{0:.1f}".format(Mean)),
+                                            str("{0:.0f}".format(Median)),
+                                            str("{0:.1f}".format(Std)),
+                                            Date))
+
+    def Pop_Prep_flat_tree(self,elem):
+        hdulist = fits.open(elem)
+        ExpTime = hdulist[0].header['EXPTIME']
+        Type = hdulist[0].header['OBSTYPE']
+        Date = hdulist[0].header['DATE-OBS']
+        Mean = np.mean(hdulist[0].data)
+        Median = np.median(hdulist[0].data)
+        Std = np.std(hdulist[0].data)
+        self.Bias_Tree = self.tree_preproc_MFLAT.insert("",
+                                    'end',
+                                    "",
+                                    text= elem.split('/')[-1],
+                                    values=(Type,
+                                            str(ExpTime),
+                                            str("{0:.1f}".format(Mean)),
+                                            str("{0:.0f}".format(Median)),
+                                            str("{0:.1f}".format(Std)),
+                                            Date))
+
+
+
+    def Pop_Prep_toproc_tree(self,elem):
+        hdulist = fits.open(elem)
+        ExpTime = hdulist[0].header['EXPTIME']
+        Type = hdulist[0].header['OBSTYPE']
+        Date = hdulist[0].header['DATE-OBS']
+        Mean = np.mean(hdulist[0].data)
+        Median = np.median(hdulist[0].data)
+        Std = np.std(hdulist[0].data)
+        self.Toproc_Tree = self.tree_preproc_TOPROC.insert("",
+                                    'end',
+                                    "",
+                                    text= elem.split('/')[-1],
+                                    values=(Type,
+                                            str(ExpTime),
+                                            str("{0:.1f}".format(Mean)),
+                                            str("{0:.0f}".format(Median)),
+                                            str("{0:.1f}".format(Std)),
+                                            Date))
+        
+    def Create_Folder_toproc_tree(self,files,foldername):
+        Toproc_Tree_Folder = self.tree_preproc_TOPROC.insert("",
+                                                            'end'
+                                                             "",
+                                                             text = foldername)
+        for elem in files:
+            hdulist = fits.open(elem)
+            ExpTime = hdulist[0].header['EXPTIME']
+            Type = hdulist[0].header['OBSTYPE']
+            Date = hdulist[0].header['DATE-OBS']
+            Mean = np.mean(hdulist[0].data)
+            Median = np.median(hdulist[0].data)
+            Std = np.std(hdulist[0].data)            
+            Toproc_Tree = self.tree_preproc_TOPROC.insert(Toproc_Tree_Folder,
+                                                          'end',
+                                                          "",
+                                                          text= elem.split('/')[-1],
+                                                          values=(Type,
+                                                                  str(ExpTime),
+                                                                  str("{0:.1f}".format(Mean)),
+                                                                  str("{0:.0f}".format(Median)),
+                                                                  str("{0:.1f}".format(Std)),
+                                                                  Date))                                                          
+            
+
 
     def load_file_preproc(self, event):
         self.fname = askopenfilenames()
@@ -1442,9 +1948,49 @@ class simpleapp_tk(Tk):
     def Preproc(self, event):
         now = datetime.datetime.now()
         module_logger_Preproc.info(now)
-        os.system('python ' + Pipe_Path + '/SP_Preproc.py ' + " ".join(self.files_preproc) + ' -b ' + self.MasterBiasName.get() + ' -f ' + self.MasterFlatName.get())
-        self.now = datetime.datetime.now()
-        module_logger_Flat.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'End of flat processing' )
+        
+        files_to_use = []
+        Children = self.tree_preproc_TOPROC.get_children()
+        for elem2 in Children:
+            if not self.tree_preproc_TOPROC.tag_has("unchecked", elem2):
+                Children2 = self.tree_preproc_TOPROC.get_children(elem2)
+                for elem in Children2:
+                    if self.tree_preproc_TOPROC.tag_has("checked", elem):
+                        print(self.tree_preproc_TOPROC.item(elem)['text'])
+                        files_to_use.append(self.tree_preproc_TOPROC.item(elem)['text']) 
+             
+        Hold = False
+        Children = self.tree_preproc_MBIAS.get_children()
+        Bias_to_use = []
+        Bias_Selected = False
+        for elem in Children:
+            if self.tree_preproc_MBIAS.tag_has("checked",elem):
+                if not Bias_Selected:
+                    Bias_to_use = self.tree_preproc_MBIAS.item(elem)['text']
+                    Bias_Selected = True
+                else:
+                    print('More than one Master bias selected!')
+                    Hold = True
+ 
+        Children = self.tree_preproc_MFLAT.get_children()
+        Flat_to_use = []
+        Flat_Selected = False
+        for elem in Children:
+            if self.tree_preproc_MFLAT.tag_has("checked",elem):
+                if not Flat_Selected:
+                    Flat_to_use = self.tree_preproc_MFLAT.item(elem)['text']
+                    Flat_Selected = True
+                else:
+                    print('More than one Master flat selected!')
+               
+                
+        if not Hold:
+            SP_Preproc.Preproc(files_to_use,Bias_to_use,Flat_to_use,False,'Procc',False)
+            
+    #        os.system('python ' + Pipe_Path + '/SP_Preproc.py ' + " ".join(self.files_preproc) + ' -b ' + self.MasterBiasName.get() + ' -f ' + self.MasterFlatName.get())
+            self.now = datetime.datetime.now()
+            module_logger_Flat.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'End of flat processing' )
+        
         
         return None
 
@@ -1453,6 +1999,26 @@ class simpleapp_tk(Tk):
 ############################################################################## 
 # SP_Flat
 ##############################################################################
+
+    def Pop_flat_tree(self,elem):
+        hdulist = fits.open(elem)
+        ExpTime = hdulist[0].header['EXPTIME']
+        Type = hdulist[0].header['OBSTYPE']
+        Date = hdulist[0].header['DATE-OBS']
+        Mean = np.nanmean(hdulist[0].data)
+        Median = np.nanmedian(hdulist[0].data)
+        Std = np.nanstd(hdulist[0].data)
+        self.Flat_Tree = self.tree_flat.insert("",
+                                    'end',
+                                    "",
+                                    text= elem.split('/')[-1],
+                                    values=(Type,
+                                            str(ExpTime),
+                                            str("{0:.1f}".format(Mean)),
+                                            str("{0:.0f}".format(Median)),
+                                            str("{0:.1f}".format(Std)),
+                                            Date))
+
 
     def load_file_flat(self, event):
         self.fname = askopenfilenames()
@@ -1495,7 +2061,14 @@ class simpleapp_tk(Tk):
     def Flat(self, event):
         now = datetime.datetime.now()
         module_logger_Flat.info(now)
-        SP_Flat.Create_Flat(self.files_flat,self.MasterFlatName_Flat.get(),True,self.MasterBiasName_Flat.get(),'none',False)
+        
+        files_to_use = []
+        Children = self.tree_flat.get_children()
+        for elem in Children:
+            if self.tree_flat.tag_has("checked", elem):
+                files_to_use.append(self.tree_flat.item(elem)['text'])
+        
+        SP_Flat.Create_Flat(files_to_use,self.MasterFlatName_Flat.get(),True,self.MasterBiasName.get(),'none',False)
         #os.system('python ' + Pipe_Path + '/SP_Flat.py ' + " ".join(self.files_flat) + ' -b ' + self.MasterBiasName.get() + ' -o ' + self.MasterFlatName.get())
         self.now = datetime.datetime.now()
         module_logger_Flat.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'End of flat processing' )
@@ -1507,21 +2080,57 @@ class simpleapp_tk(Tk):
 ############################################################################## 
 # SP_Bias
 ##############################################################################
+    def Pop_bias_tree(self,elem):
+        hdulist = fits.open(elem)
+        ExpTime = hdulist[0].header['EXPTIME']
+        Type = hdulist[0].header['OBSTYPE']
+        Date = hdulist[0].header['DATE-OBS']
+        Mean = np.nanmean(hdulist[0].data)
+        Median = np.nanmedian(hdulist[0].data)
+        Std = np.nanstd(hdulist[0].data)
+        self.Bias_Tree = self.tree_bias.insert("",
+                                    'end',
+                                    "",
+                                    text= elem.split('/')[-1],
+                                    values=(Type,
+                                            str(ExpTime),
+                                            str("{0:.1f}".format(Mean)),
+                                            str("{0:.0f}".format(Median)),
+                                            str("{0:.1f}".format(Std)),
+                                            Date))
+
+
+
 
     def load_file_bias(self, event):
         self.fname = askopenfilenames()
         self.now = datetime.datetime.now()
         self.files_bias=[]
+        self.files_bias_name = []
+        
+        # Clear bias tree
+        self.tree_bias.delete(*self.tree_bias.get_children())
+        
         for elem in self.fname:
             module_logger_Bias.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
             self.files_bias.append(elem)
+            self.files_bias_name.append(elem.split('/')[-1])
+            # Populate bias tree
+            self.Pop_bias_tree(elem)
 
+        Children = self.tree_bias.get_children()
+        for elem in Children:
+            self.tree_bias.change_state(elem, "checked")
+
+        self.menu_BiasFiles = StringVar(self.frame_fits)
+        self.menu_BiasFiles.set(self.files_bias_name[0]) # default value  
+
+        self.BiasFiles = OptionMenu(self.frame_fits, self.menu_BiasFiles, *self.files_bias_name)
+        self.BiasFiles.pack()   
 
         self.read_all_fits(self.files_bias)
-        print(self.images[0])
         
         self.canvas.delete("all")
-#        self.tkimage.forget()
         self.canvas.forget()
         
         
@@ -1550,9 +2159,17 @@ class simpleapp_tk(Tk):
     def Bias(self, event):
         now = datetime.datetime.now()
         module_logger_Bias.info(now)
-        print(self.MasterBiasName.get())
-        print('python ' + Pipe_Path + '/SP_Bias.py ' + " ".join(self.files_bias) + ' -o ' + self.MasterBiasName.get())
-        os.system('python ' + Pipe_Path + '/SP_Bias.py ' + " ".join(self.files_bias) + ' -o ' + self.MasterBiasName.get())
+        
+        files_to_use = []
+        Children = self.tree_bias.get_children()
+        for elem in Children:
+            if self.tree_bias.tag_has("checked", elem):
+                files_to_use.append(self.tree_bias.item(elem)['text'])        
+        
+        SP_Bias.Create_Bias(files_to_use,self.MasterBiasName_Bias.get(),False,False,self.menu_BiasCombine.get())
+        
+        
+#        os.system('python ' + Pipe_Path + '/SP_Bias.py ' + " ".join(self.files_bias) + ' -o ' + self.MasterBiasName.get())
         self.now = datetime.datetime.now()
         module_logger_Bias.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'End of bias processing' )
         
@@ -1565,23 +2182,48 @@ class simpleapp_tk(Tk):
     def load_file_prepare(self, event):
         self.fname = askopenfilenames()
         self.now = datetime.datetime.now()
+        self.tree_prepare.delete(*self.tree_prepare.get_children())
         self.files_prepare=[]
         for elem in self.fname:
-#            module_logger2.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
+            header = fits.getheader(elem) # get the header without opening data
+            Type = header['OBSTYPE']
+            ExpTime = header['EXPTIME']
+            Date = header['DATE-OBS']
+            Grat = header['GRATING']
+            GratAng = header['WAVELENG']
+            Target = header['OBJECT']
+            RotAng = header['CRPA']
+            self.Prepare_Tree = self.tree_prepare.insert("",
+                                    'end',
+                                    "",
+                                    text= elem.split('/')[-1],
+                                    values=(Type,
+                                            str(ExpTime),
+                                            Date,
+                                            str(Grat),
+                                            str(GratAng),
+                                            str(Target),
+                                            str(RotAng)))
             self.files_prepare.append(elem.split('/')[-1])
 
+        Children = self.tree_prepare.get_children()
+        for elem in Children:
+            self.tree_prepare.change_state(elem, "checked")
 
         return None
+
 
     def Prepare(self,event):
         now = datetime.datetime.now()
         module_logger.info(now)
-#        for elem in self.files_prepare:
-#            self.logger.info('Prepare file ' + str(elem.split("\\")[0]))
-        SP_Prepare.Prepare(self.files_prepare)
-#        self.now = datetime.datetime.now()
-#        module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'File preparation done' )
-        
+
+        files_to_prepare = []
+        Children = self.tree_prepare.get_children()
+        for elem in Children:
+            if self.tree_prepare.tag_has("checked", elem):
+                files_to_prepare.append(self.tree_prepare.item(elem)['text'])
+
+        SP_Prepare.Prepare(files_to_prepare)        
         return None
 
 ############################################################################## 
