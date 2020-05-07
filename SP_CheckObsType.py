@@ -30,6 +30,11 @@ import numpy as np
 import os
 import shutil
 
+import pickle
+
+import pandas as pd
+from sklearn import preprocessing, cross_validation, neighbors
+
 from astropy.io import fits
 
 from SP_CheckInstrument import CheckInstrument
@@ -43,8 +48,11 @@ from astropy import units as u
 
 _SP_conf.filenames = []
 
+directory = _SP_conf.rootpath
 
-def CheckObsType(filenames,telescope,obsparam):
+def CheckObsType(filenames,telescope,obsparam,Method = 'Normal'):
+    
+    print(Method)
     
     # List of usual solar analog ID for astroquery
     
@@ -137,7 +145,6 @@ def CheckObsType(filenames,telescope,obsparam):
             
         hdulist[0].data = data # update the data in the fits file
 
-
             
         # Get statistic information about the data 
         Med = np.nanmedian(data[10:-10,10:-10])
@@ -159,7 +166,7 @@ def CheckObsType(filenames,telescope,obsparam):
         hdulist[0].header['Std'] = (std0,'Standard deviation of the image (SP)')        
         hdulist[0].header['StdX'] = (std1,'Standard deviation of the image along the x axis (SP)') 
         hdulist[0].header['StdY'] = (std,'Standard deviation of the image along the y axis (SP)') 
-        
+      
         
         if telescope =='NOT':
             index = filename.split('.')[0]
@@ -352,6 +359,41 @@ def CheckObsType(filenames,telescope,obsparam):
         ######################################################################
         
         if telescope == 'DEVENY':
+            
+            if Method == 'Gen':
+                
+                
+                mean = np.nanmean(data)
+    
+                median = np.nanmedian(data)
+    
+                std0 = np.nanmean(np.std(data,axis=0))
+                std1 = np.nanmean(np.std(data,axis=1))
+                std = np.nanstd(data)
+                
+                
+                clf = pickle.load( open( directory + "/Imag_Rec.p", "r" ) )
+                
+                example_measures = np.array([mean, median, std, std0, std1])
+                example_measures = example_measures.reshape(1, -1)
+    
+                prediction = clf.predict(example_measures)
+                print(prediction)
+            if Method == 'Normal':  
+                if Med > Max/5 and std0 > 1000:
+                    prediction = 'Flat'
+                else:
+                    if std0 + std1 < 10 and int(hdulist[0].header[obsparam['exptime']]) == 0:
+                        prediction = 'Bias'
+                    else:
+                        if std0/std1 > 100:
+                            prediction = 'Arcs'
+                        else:
+                            prediction = 'Spectrum'
+                            
+                print(prediction)
+                        
+            
             Arcs = False
             
             # Extract informations for header 
@@ -364,86 +406,79 @@ def CheckObsType(filenames,telescope,obsparam):
             index = filename.split('.')[1]
             
             # Identify FLAT images 
-            if Med > Max/5 and std0 > 1000:
+            if prediction == 'Flat':
                 # Update header
                 hdulist[0].header['HISTORY'] = 'SP: %s changed to FLAT' % (str(hdulist[0].header[obsparam['obstype']]))
                 hdulist[0].header[obsparam['obstype']] = 'FLAT'
                 Name= telescope + '_' + index + '_' + TIME + '_FLAT_' + EXPTIME + '.fits'
                 hdulist[0].header['HISTORY'] = 'SP: %s changed to %s' % (filename, Name)
                 
-            else:
-                # Identify BIAS images
-                if std0 + std1 < 10 and int(hdulist[0].header[obsparam['exptime']]) == 0: 
+            if prediction == 'Bias':
                     
-                    # Update header
-                    hdulist[0].header['HISTORY'] = 'SP: %s changed to BIAS' % (str(hdulist[0].header[obsparam['obstype']]))
-                    hdulist[0].header[obsparam['obstype']] = 'BIAS'
-                    Name= telescope + '_' + filename.split('.')[1] + '_' + TIME + '_BIAS_' + EXPTIME + '.fits'
-                    hdulist[0].header['HISTORY'] = 'SP: %s changed to %s' % (filename, Name)
+            # Update header
+                hdulist[0].header['HISTORY'] = 'SP: %s changed to BIAS' % (str(hdulist[0].header[obsparam['obstype']]))
+                hdulist[0].header[obsparam['obstype']] = 'BIAS'
+                Name= telescope + '_' + filename.split('.')[1] + '_' + TIME + '_BIAS_' + EXPTIME + '.fits'
+                hdulist[0].header['HISTORY'] = 'SP: %s changed to %s' % (filename, Name)
                     
-                else:
-                    # Identify ARCS images
-                    if std0/std1 > 100:
-                        
-                        # Keep track of the focus value for arcs images
-                        CollFoc.append((int(filename.split('.')[1]),hdulist[0].header['COLLFOC'],idx))                                                            
-                        
-#                        Name= telescope + '_' + filename.split('.')[1] + '_' + TIME + '_ARCS_' + EXPTIME + '.fits'
+            if prediction == 'Arcs':
 
-                        # Update header 
-                        hdulist[0].header['HISTORY'] = 'SP: %s changed to ARCS/FOCUS' % (str(hdulist[0].header[obsparam['obstype']]))
-                        hdulist[0].header[obsparam['obstype']] = 'ARCS/FOCUS' 
-                        Arcs = True
-                    # If not Flat, Bias, or Arcs then is a science acquisition            
-                    else:
+                # Keep track of the focus value for arcs images
+                CollFoc.append((int(filename.split('.')[1]),hdulist[0].header['COLLFOC'],idx))                                                            
                         
-                        # Update header                         
-                        hdulist[0].header['HISTORY'] = 'SP: %s changed to OBJECT' % (str(hdulist[0].header[obsparam['obstype']]))
-                        hdulist[0].header[obsparam['obstype']] = 'OBJECT'
+                # Update header 
+                hdulist[0].header['HISTORY'] = 'SP: %s changed to ARCS/FOCUS' % (str(hdulist[0].header[obsparam['obstype']]))
+                hdulist[0].header[obsparam['obstype']] = 'ARCS/FOCUS' 
+                Arcs = True
+             
+            if prediction == 'Spectrum':
                         
-                        OBJECT = hdulist[0].header[obsparam['object']].replace(' ','').replace('/','')
+                # Update header                         
+                hdulist[0].header['HISTORY'] = 'SP: %s changed to OBJECT' % (str(hdulist[0].header[obsparam['obstype']]))
+                hdulist[0].header[obsparam['obstype']] = 'OBJECT'
                         
-                        # Assume an unknown object as a first gest 
-                        TYPE = 'Unknown'
-                        print(obsparam['object'])
-                        if OBJECT.replace(' ',''):
-                            print(OBJECT)
-                            try: # Try to retrieve the object using Horizons, if it find the object, assigned the object type to Asteroid
-                                Horizons(id=OBJECT).ephemerides()
-                                TYPE = 'Asteroid'
-                            except ValueError: #if object not find in Horizons, check simbad for standard stars
-                                try: 
-                                    result_table = Simbad.query_region(coord.SkyCoord(hdulist[0].header[obsparam['ra']] + ' ' + hdulist[0].header[obsparam['dec']] ,unit=(u.hourangle,u.deg), frame='icrs'), radius='0d1m00s')
-                                    T = result_table['MAIN_ID'][0]
-                                    if result_table['MAIN_ID'][0] in List_ID_SA: # Compares the ID found with simbad with our list of standard stars, if there is a match, Type = SA
-                                        OBJECT = List_ID_SA_Comp[result_table['MAIN_ID'][0]]
-                                        TYPE = 'SA'
-                                except: # If not found then object remains unknown
-                                    pass
-                                if TYPE == 'Unknown': #if object still unknown try to clean the object name
-        #                        except TypeError:
-                                    if '(' in OBJECT and ')' in OBJECT:
-                                        Number = OBJECT[OBJECT.find("(")+1:OBJECT.find(")")]
-                                        if Number.isdigit():
-                                            try:
-                                                Horizons(id=Number).ephemerides()
-                                                TYPE = 'Asteroid'
-                                            except ValueError:
-                                                TYPE = 'Unknown'
-                                    if OBJECT[0:3].isdigit():
-                                        if not ' ' in OBJECT:
-                                            Name = OBJECT[0:4] + ' ' + OBJECT[4:]
-                                            try:
-                                                Horizons(id=Name).ephemerides()
-                                                TYPE = 'Asteroid'
-                                            except ValueError:
-                                                TYPE = 'Unknown'
+                OBJECT = hdulist[0].header[obsparam['object']].replace(' ','').replace('/','')
+                        
+                # Assume an unknown object as a first gest 
+                TYPE = 'Unknown'
+                print(obsparam['object'])
+                if OBJECT.replace(' ',''):
+                    print(OBJECT)
+                    try: # Try to retrieve the object using Horizons, if it find the object, assigned the object type to Asteroid
+                        Horizons(id=OBJECT).ephemerides()
+                        TYPE = 'Asteroid'
+                    except ValueError: #if object not find in Horizons, check simbad for standard stars
+                    
+                        try: 
+                            result_table = Simbad.query_region(coord.SkyCoord(hdulist[0].header[obsparam['ra']] + ' ' + hdulist[0].header[obsparam['dec']] ,unit=(u.hourangle,u.deg), frame='icrs'), radius='0d1m00s')
+                            T = result_table['MAIN_ID'][0]
+                        
+                            if result_table['MAIN_ID'][0] in List_ID_SA: # Compares the ID found with simbad with our list of standard stars, if there is a match, Type = SA
+                                OBJECT = List_ID_SA_Comp[result_table['MAIN_ID'][0]]
+                                TYPE = 'SA'
+                        except: # If not found then object remains unknown
+                            pass
+                    if TYPE == 'Unknown': #if object still unknown try to clean the object name
+        #               except TypeError:
+                        if '(' in OBJECT and ')' in OBJECT:
+                            Number = OBJECT[OBJECT.find("(")+1:OBJECT.find(")")]
+                            if Number.isdigit():
+                                try:
+                                    Horizons(id=Number).ephemerides()
+                                    TYPE = 'Asteroid'
+                                except ValueError:
+                                    TYPE = 'Unknown'
+                            if OBJECT[0:3].isdigit():
+                                if not ' ' in OBJECT:
+                                    Name = OBJECT[0:4] + ' ' + OBJECT[4:]
+                                    try:
+                                        Horizons(id=Name).ephemerides()
+                                        TYPE = 'Asteroid'
+                                    except ValueError:
+                                        TYPE = 'Unknown'
                                  
-                                
-                                        
-                                
-                            Name= telescope  + '_' + index + '_' + TIME + '_' + TYPE + '_' + OBJECT + '_' + EXPTIME + '.fits'
-                            hdulist[0].header['HISTORY'] = 'SP: %s changed to %s' % (filename, Name)
+                Name= telescope  + '_' + index + '_' + TIME + '_' + TYPE + '_' + OBJECT + '_' + EXPTIME + '.fits'
+            hdulist[0].header['HISTORY'] = 'SP: %s changed to %s' % (filename, Name)
 
             if not Arcs:
                 hdulist[0].writeto(Name,overwrite=True)
@@ -473,8 +508,28 @@ def CheckObsType(filenames,telescope,obsparam):
             OBJECT = hdulist[0].header[obsparam['object']].replace(' ','').replace('/','')
             Name= telescope + '_' + index + '_' + TIME + '_' + TYPE + '_' + OBJECT + '_' + CENTWAVE +'_' + EXPTIME + '.fits'
             hdulist.writeto(Name)    
-            
+
         
+        
+        if telescope == 'DEVENY':
+            # Extract informations for header 
+            
+            TIME = hdulist[0].header[obsparam['date_keyword']].replace('-','').replace(':','').replace('.','')
+            EXPTIME = str(hdulist[0].header[obsparam['exptime']]).replace('.','s')
+
+            # get the index of the file
+            index = filename.split('.')[1]
+            
+            # Identify FLAT images 
+            if prediction == 'Flat':
+                # Update header
+                hdulist[0].header['HISTORY'] = 'SP: %s changed to FLAT' % (str(hdulist[0].header[obsparam['obstype']]))
+                hdulist[0].header[obsparam['obstype']] = 'FLAT'
+                Name= telescope + '_' + index + '_' + TIME + '_FLAT_' + EXPTIME + '.fits'
+                hdulist[0].header['HISTORY'] = 'SP: %s changed to %s' % (filename, Name)
+
+                
+     
 
     if telescope == 'DEVENY':
         

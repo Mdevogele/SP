@@ -69,8 +69,13 @@ def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
         Wavel = [Wav, Wav]
         Spectre = [SpecA, SpecSA]
         Err = [ErrA,ErrSA]
-    
-        SpecN,ErrN, WavN = SP.Shift_Spec(Spectre,Err,Wavel,**DetecFlags)
+        try:
+            SpecN,ErrN, WavN = SP.Shift_Spec(Spectre,Err,Wavel,**DetecFlags)
+        except:
+            print('Shift spec routine failed, used unshifted spectrum')
+            SpecN=Spectre
+            ErrN = Err
+            WavN = Wavel
         
         SpecA = SpecN[0]
         SpecSA = SpecN[1]

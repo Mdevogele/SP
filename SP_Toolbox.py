@@ -2032,7 +2032,6 @@ def Fit_Trace(hdulist,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **k
 
         p0 = coeffIn
         for i in range(Start[0],2030,1):
-            print(p0[4])
             xs = range(int(p0[4])-Range,int(p0[4])+Range)
             SS = np.median(data[xs,i-15:i+15],axis=1)
             print("Extraction of the column {0:4}".format(str(i)), end='\r')

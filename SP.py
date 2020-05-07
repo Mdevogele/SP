@@ -15,10 +15,13 @@ from tkinter import messagebox
 
 from ttkwidgets import CheckboxTreeview
 
-from astropy.visualization import PercentileInterval, ZScaleInterval
-
-from astropy.io import fits
-
+try:
+    from astropy.visualization import PercentileInterval, ZScaleInterval
+    from astropy.io import fits
+except: 
+    print('Astropy module was not found. try: pip install astropy')
+    
+    
 import logging
 import datetime
 
@@ -1034,7 +1037,6 @@ class simpleapp_tk(Tk):
             #Create the folder containing the individual files
             Folder1 = self.tree_WavCal.insert("",
                                 'end',
-                                "",
                                 text= str(elem),
                                 values=(Type,
                                         str(ExpTime),
@@ -1057,7 +1059,6 @@ class simpleapp_tk(Tk):
                 Std = np.std(hdulist[0].data)
                 self.WavCal_Tree = self.tree_WavCal.insert(Folder1,
                                 'end',
-                                "",
                                 text= 'bla',
                                 values=(Type,
                                         str(ExpTime),
@@ -1438,7 +1439,6 @@ class simpleapp_tk(Tk):
         Std = np.std(hdulist[0].data)
         self.CosmCorr_Tree = self.tree_CosmCorr.insert("",
                                     'end',
-                                    "",
                                     text= elem.split('/')[-1],
                                     values=(Type,
                                             str(ExpTime),
@@ -1511,7 +1511,6 @@ class simpleapp_tk(Tk):
         Std = np.std(hdulist[0].data)
         self.Bias_Tree = self.tree_preproc_MBIAS.insert("",
                                     'end',
-                                    "",
                                     text= elem.split('/')[-1],
                                     values=(Type,
                                             str(ExpTime),
@@ -1530,7 +1529,6 @@ class simpleapp_tk(Tk):
         Std = np.std(hdulist[0].data)
         self.Bias_Tree = self.tree_preproc_MFLAT.insert("",
                                     'end',
-                                    "",
                                     text= elem.split('/')[-1],
                                     values=(Type,
                                             str(ExpTime),
@@ -1551,7 +1549,6 @@ class simpleapp_tk(Tk):
         Std = np.std(hdulist[0].data)
         self.Toproc_Tree = self.tree_preproc_TOPROC.insert("",
                                     'end',
-                                    "",
                                     text= elem.split('/')[-1],
                                     values=(Type,
                                             str(ExpTime),
@@ -1665,7 +1662,6 @@ class simpleapp_tk(Tk):
         Std = np.std(hdulist[0].data)
         self.Flat_Tree = self.tree_flat.insert("",
                                     'end',
-                                    "",
                                     text= elem.split('/')[-1],
                                     values=(Type,
                                             str(ExpTime),
@@ -1747,7 +1743,6 @@ class simpleapp_tk(Tk):
         Std = np.std(hdulist[0].data)
         self.Bias_Tree = self.tree_bias.insert("",
                                     'end',
-                                    "",
                                     text= elem.split('/')[-1],
                                     values=(Type,
                                             str(ExpTime),
@@ -1846,13 +1841,21 @@ class simpleapp_tk(Tk):
             ExpTime = header['EXPTIME']
             Date = header['DATE-OBS']
             Grat = header['GRATING']
-            GratAng = header[obsparam['grat_ang']]
+            try:
+                GratAng = header[obsparam['grat_ang']]
+            except:
+                GratAng = 'NA'
+                
             Target = header[obsparam['object']]
             RotAng = header[obsparam['posangle']]
-            CollFoc = header[obsparam['focus']]
+            
+            try:
+                CollFoc = header[obsparam['focus']]
+            except:
+                CollFoc = 'NA'
+                
             self.Prepare_Tree = self.tree_prepare.insert("",
                                     'end',
-                                    "",
                                     text= elem.split('/')[-1],
                                     values=(Type,
                                             str(ExpTime),

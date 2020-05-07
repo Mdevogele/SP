@@ -76,7 +76,7 @@ def Prepare(filenames,Verbose=True):
 
 
     
-    CheckObsType(filenames,telescope,obsparam)
+    CheckObsType(filenames,telescope,obsparam,Method = 'Normal')
 
 
     logging.info('**************************************')

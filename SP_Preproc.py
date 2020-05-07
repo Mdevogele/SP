@@ -38,8 +38,6 @@ def Preproc(filenames,MasterBias,MasterFlat,Verbose,Suffix,Diagnostic):
                 Prepared = False
         except:
             Prepared = False
-
-        print(Header['SP_PREPA'])
         
         if Prepared:
             compteur += 1
