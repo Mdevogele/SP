@@ -38,8 +38,16 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
     
     SpecA = np.loadtxt(filenames[0]).transpose()
     SpecA = np.array(SpecA)
+
+    if telescope == 'DEVENY':
+        DetecFlags = {'Instrument':'Deveny'} 
+        try:
+            Grating = int(str(hdulist[0].header[obsparam['grating']]).split('/')[0])
+        except:
+            Grating = 300
+
     
-    if Method == 'template':
+    if Method == 'Template':
     
     
         if telescope == 'GMOSS' or telescope == 'GMOSN':
@@ -49,8 +57,9 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
             Binning = hdulist[1].header['CCDSUM'][0]
             DetecFlags = {'Instrument':telescope, 'Binning' : Binning, 'Gratting':Gratting, 'Detector':Detector}  
             print DetecFlags
-        if telescope == 'DEVENY':
-            DetecFlags = {'Instrument':'Deveny'}  
+#        if telescope == 'DEVENY':
+#            DetecFlags = {'Instrument':'Deveny'} 
+#            Grating = int(str(hdulist[0].header[obsparam['grating']]).split('/')[0])
         if telescope == 'SOAR':
             DetecFlags = {'Instrument':'Soar'}      
         if telescope == 'NOT':
@@ -82,22 +91,27 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
           
         np.savetxt(OutFile,np.array([Wav,SpecA[0,:],SpecA[1,:]]).transpose())
           
-    if Method == 'auto':
+    if Method == 'Auto':
         Dim = []
 
         Dim.append(np.size(Arcs,0))
         Dim.append(np.size(Arcs,1))
     
         Arcs_L = Arcs[Line,:] 
-        Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.35, Tresh_Arcs = [2, 12] )
+        Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.1, Tresh_Arcs = [2, 12] )
         
         
         if telescope == 'DEVENY':
-            f = open(Pipe_Path +'/Pre_Comp_Deveny')
-            Pre = pickle.load(f)
-            f.close()
-            WV = [7503.9,7635.1,7723.8,7948.2,8014.8,8115.3,8264.5,8424.6,8521.4,9122.9,9224.5,9657.8]
-#            WV = [3261.05, 3610.51, 3650.15, 4046.56, 4358.33, 4678.16, 4799.92, 5085.82, 5460.74, 5769.6, 5790.7, 6965.5, 7067.2, 7272.9, 7384.0]
+            if Grating == 150:
+                f = open(Pipe_Path +'/Pre_Comp_Deveny')
+                Pre = pickle.load(f)
+                f.close()
+                WV = [7503.9,7635.1,7723.8,7948.2,8014.8,8115.3,8264.5,8424.6,8521.4,9122.9,9224.5,9657.8]
+            if Grating == 300:
+                f = open(Pipe_Path +'/Pre_Comp_Deveny_R300')
+                Pre = pickle.load(f)
+                f.close()               
+                WV = [3261.05, 3610.51, 3650.15, 4046.56, 4358.33, 4678.16, 4799.92, 5085.82, 5460.74, 5769.6, 5790.7, 6965.5, 7067.2, 7272.9, 7384.0]
         else:
             f = open(Pipe_Path + '/Wav_Precomp','r')
             Pre = pickle.load(f)
@@ -201,7 +215,8 @@ if __name__ == '__main__':
     parser.add_argument('-f',
                         help='Do full frame wavelength calibration',
                         action="store_true",
-                        default = False)      
+                        default = False)
+         
     
     
     parser.add_argument('images', help='images to process or \'all\'',
