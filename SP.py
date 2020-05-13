@@ -36,6 +36,7 @@ import SP_Extract
 import SP_Combine
 import SP_Flat
 import SP_Preproc
+import SP_WavCal
 from SP_CheckInstrument import CheckInstrument
 
 
@@ -57,9 +58,16 @@ from scipy import misc
 
 from scipy.optimize import curve_fit
 
-from matplotlib.backends.backend_agg import FigureCanvasAgg
-import matplotlib.backends.tkagg as tkagg
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+
+if sys.version_info <= (3,0):
+    # if python 2
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    import matplotlib.backends.tkagg as tkagg
+else: 
+    # if python 3
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk as NavigationToolbar2TkAgg
 
 import time
 from datetime import date
@@ -671,50 +679,6 @@ class simpleapp_tk(Tk):
         
         self.tree_CosmCorr.grid(column=1,row = 0)    
 
-
-
-
-
-    def BckgSub_GUI(self):
-
-        self.Frame_BckgSub_Button = Frame(self.tab_BckgSub, width=200, height=400)
-        self.Frame_BckgSub_Button.grid(row = 0,column =0)
-        
-        self.Frame_BckgSub_Info = Frame(self.tab_BckgSub, width=800, height=400)
-        self.Frame_BckgSub_Info.grid(row = 0,column =1)     
-
-        
-        self.BckgSub_load_button = Button(self.Frame_BckgSub_Button, text="Load files", width=20)
-        self.BckgSub_load_button.grid(row=0, column=0, sticky=W)  
-        self.BckgSub_load_button.bind("<ButtonRelease-1>", self.load_file_bckgsub)    
- 
-        self.BckgSub_run_button = Button(self.Frame_BckgSub_Button, text="Remove background", width=20)
-        self.BckgSub_run_button.grid(row=1, column=0, sticky=W)  
-        self.BckgSub_run_button.bind("<ButtonRelease-1>", self.BckgSub)   
-       
-        
-        self.Live_BckgSub = IntVar()
-        self.Check_Live_BckgSub = Checkbutton(self.Frame_BckgSub_Button, text="Live processing", variable=self.Live_BckgSub).grid(column = 0,row=2)
-        
-        self.tree_BckgSub = CheckboxTreeview(self.Frame_BckgSub_Info)
-        self.tree_BckgSub["columns"]=("Type","ExpTime","Mean","Median","std","Date")
-        self.tree_BckgSub.column("#0", width=400)
-        self.tree_BckgSub.column("Type", width=50)
-        self.tree_BckgSub.column("ExpTime", width=50)
-        self.tree_BckgSub.column("Mean", width=70)
-        self.tree_BckgSub.column("Median", width=70)
-        self.tree_BckgSub.column("std", width=70)
-        self.tree_BckgSub.column("Date", width=200)
-        
-        self.tree_BckgSub.heading("#0",text="File name",anchor=W)
-        self.tree_BckgSub.heading("Type",text="Type",anchor=CENTER)
-        self.tree_BckgSub.heading("ExpTime", text="Exp time",anchor=CENTER)
-        self.tree_BckgSub.heading("Mean", text="Mean",anchor=CENTER)
-        self.tree_BckgSub.heading("Median", text="Median",anchor=CENTER)
-        self.tree_BckgSub.heading("std", text="std",anchor=CENTER)
-        self.tree_BckgSub.heading("Date", text="Date",anchor=W)
-        
-        self.tree_BckgSub.grid(column=1,row = 0)   
         
 
 
@@ -842,12 +806,24 @@ class simpleapp_tk(Tk):
         Label(self.Frame_WavCal_Button, text='Type: ').grid(row=5,column = 0)
         self.WavCal_Type = OptionMenu(self.Frame_WavCal_Button, self.menu_WavCal_Type, "1D", "2D")
         self.WavCal_Type.grid(column=1, row=5, sticky=W)        
+
+
+        self.menu_WavCal_Method = StringVar(self.Frame_WavCal_Button)
+        self.menu_WavCal_Method.set("Auto") # default value   
+        
+        Label(self.Frame_WavCal_Button, text='Method: ').grid(row=6,column = 0)
+        self.WavCal_Method = OptionMenu(self.Frame_WavCal_Button, self.menu_WavCal_Method, "Auto", "Template")
+        self.WavCal_Method.grid(column=1, row=6, sticky=W)   
+
+
+
         
         self.tree_WavCal = CheckboxTreeview(self.Frame_WavCal_Info)
-        self.tree_WavCal["columns"]=("Type","ExpTime","Lamp1","Lamp2","Lamp3","Lamp4")
+        self.tree_WavCal["columns"]=("Type","ExpTime","Grating","Lamp1","Lamp2","Lamp3","Lamp4")
         self.tree_WavCal.column("#0", width=400)
         self.tree_WavCal.column("Type", width=50)
         self.tree_WavCal.column("ExpTime", width=50)
+        self.tree_WavCal.column("Grating", width=50)
         self.tree_WavCal.column("Lamp1", width=30)
         self.tree_WavCal.column("Lamp2", width=30)
         self.tree_WavCal.column("Lamp3", width=30)
@@ -856,6 +832,7 @@ class simpleapp_tk(Tk):
         self.tree_WavCal.heading("#0",text="File name",anchor=W)
         self.tree_WavCal.heading("Type",text="Type",anchor=CENTER)
         self.tree_WavCal.heading("ExpTime", text="Exp time",anchor=CENTER)
+        self.tree_WavCal.heading("Grating", text="Grating", anchor=CENTER)
         self.tree_WavCal.heading("Lamp1", text="Ar",anchor=CENTER)
         self.tree_WavCal.heading("Lamp2", text="Ne",anchor=CENTER)
         self.tree_WavCal.heading("Lamp3", text="Hg",anchor=CENTER)
@@ -1003,6 +980,7 @@ class simpleapp_tk(Tk):
             ExpTime = hdulist[0].header['EXPTIME']
             Type = hdulist[0].header['OBSTYPE']                
             Date = hdulist[0].header['DATE-OBS']
+            Grating = hdulist[0].header[obsparam['grating']]
             Lamp1_Text = obsparam['lamp1_name']
             Lamp2_Text = obsparam['lamp2_name']
             Lamp3_Text = obsparam['lamp3_name']
@@ -1040,6 +1018,7 @@ class simpleapp_tk(Tk):
                                 text= str(elem),
                                 values=(Type,
                                         str(ExpTime),
+                                        str(Grating),
                                         Lamp1_OnOff,
                                         Lamp2_OnOff,
                                         Lamp3_OnOff,
@@ -1152,7 +1131,7 @@ class simpleapp_tk(Tk):
     def WavCal(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        os.system('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + ' -a ' + " ".join(self.files_WavCal) + ' -m template' + ' -o ' + os.path.split(self.files_WavCal[0])[0] + '/' + self.WVName.get())
+        SP_WavCal.WavCal(self.files_WavCal_Spec,self.files_WavCal,os.path.split(self.files_WavCal[0])[0] + '/' + self.WVName.get(),False,self.menu_WavCal_Method.get(),250,False)
         self.now = datetime.datetime.now()
         module_logger_WavCal.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Wavelength calibration done' )
         
@@ -1332,6 +1311,65 @@ class simpleapp_tk(Tk):
 ##############################################################################
 
 
+    # GUI
+    
+    def BckgSub_GUI(self):
+
+        self.Frame_BckgSub_Button = Frame(self.tab_BckgSub, width=200, height=400)
+        self.Frame_BckgSub_Button.grid(row = 0,column =0)
+        
+        self.Frame_BckgSub_Info = Frame(self.tab_BckgSub, width=800, height=400)
+        self.Frame_BckgSub_Info.grid(row = 0,column =1)     
+
+        
+        self.BckgSub_load_button = Button(self.Frame_BckgSub_Button, text="Load files", width=20)
+        self.BckgSub_load_button.grid(row=0, column=0, sticky=W)  
+        self.BckgSub_load_button.bind("<ButtonRelease-1>", self.load_file_bckgsub)    
+ 
+        self.BckgSub_run_button = Button(self.Frame_BckgSub_Button, text="Remove background", width=20)
+        self.BckgSub_run_button.grid(row=1, column=0, sticky=W)  
+        self.BckgSub_run_button.bind("<ButtonRelease-1>", self.BckgSub)   
+       
+        Label(self.Frame_BckgSub_Button, text='# pixels:').grid(row=2,column = 0)
+        self.NPIX = Entry(self.Frame_BckgSub_Button) 
+        self.NPIX.grid(row=2, column=1) 
+        self.NPIX.insert(END,'100')  
+        
+        self.SelectPix_BckgSub = IntVar()
+        self.Check_Live_BckgSub = Checkbutton(self.Frame_BckgSub_Button, text="Use selected pixel", variable=self.SelectPix_BckgSub).grid(column = 0,row=3)   
+        
+        self.SelectPix_Entry = Entry(self.Frame_BckgSub_Button) 
+        self.SelectPix_Entry.grid(row=3, column=1) 
+        self.SelectPix_Entry.insert(END,250)  
+
+
+      
+        self.Live_BckgSub = IntVar()
+        self.Check_Live_BckgSub = Checkbutton(self.Frame_BckgSub_Button, text="Live processing", variable=self.Live_BckgSub).grid(column = 0,row=4)
+        
+        self.tree_BckgSub = CheckboxTreeview(self.Frame_BckgSub_Info)
+        self.tree_BckgSub["columns"]=("Type","ExpTime","Mean","Median","std","Date")
+        self.tree_BckgSub.column("#0", width=400)
+        self.tree_BckgSub.column("Type", width=50)
+        self.tree_BckgSub.column("ExpTime", width=50)
+        self.tree_BckgSub.column("Mean", width=70)
+        self.tree_BckgSub.column("Median", width=70)
+        self.tree_BckgSub.column("std", width=70)
+        self.tree_BckgSub.column("Date", width=200)
+        
+        self.tree_BckgSub.heading("#0",text="File name",anchor=W)
+        self.tree_BckgSub.heading("Type",text="Type",anchor=CENTER)
+        self.tree_BckgSub.heading("ExpTime", text="Exp time",anchor=CENTER)
+        self.tree_BckgSub.heading("Mean", text="Mean",anchor=CENTER)
+        self.tree_BckgSub.heading("Median", text="Median",anchor=CENTER)
+        self.tree_BckgSub.heading("std", text="std",anchor=CENTER)
+        self.tree_BckgSub.heading("Date", text="Date",anchor=W)
+        
+        self.tree_BckgSub.grid(column=1,row = 0)   
+
+
+
+    # Function that read the fits files
     def read_all_fits(self, filenames):
         """ read in all image data, scale images """
         self.data=[]
@@ -1343,27 +1381,6 @@ class simpleapp_tk(Tk):
             hdulist = fits.open(filename, ignore_missing_end=True)
             imgdat = hdulist[0].data
             self.data.append(imgdat)
-
-#            print(imgdat)
-#            median = np.nanmedian(imgdat[int(imgdat.shape[0]*0.25):
-#                                         int(imgdat.shape[0]*0.75),
-#                                         int(imgdat.shape[1]*0.25):
-#                                         int(imgdat.shape[1]*0.75)])
-#            std    = np.nanstd(imgdat[int(imgdat.shape[0]*0.25):
-#                                      int(imgdat.shape[0]*0.75),
-#                                      int(imgdat.shape[1]*0.25):
-#                                      int(imgdat.shape[1]*0.75)])
-#            print('(Median,std)')
-#            print(median,std)
-#            
-##            median = 10
-##            std = 2
-#    
-#            print(median,std)
-#    
-#            imgdat = old_div(np.clip(imgdat, median-0.5*std,
-#                                median+0.5*std),(old_div(std,256)))
-#            imgdat = imgdat - np.nanmin(imgdat)
             
             imgdat = self.Zscale(imgdat)
             
@@ -1374,6 +1391,7 @@ class simpleapp_tk(Tk):
             self.images.append(Image.fromarray(imgdat))
 
 
+    # Function that load the background files
     def load_file_bckgsub(self, event):
         self.fname = askopenfilenames()
         self.now = datetime.datetime.now()
@@ -1410,13 +1428,17 @@ class simpleapp_tk(Tk):
         self.canvas.bind("<Button 2>", self.right_click)           
         return None
 
+
+    # Correct the background
     def BckgSub(self, event):
         now = datetime.datetime.now()
         module_logger.info(now)
-        if self.Yloc:
-            SP_BckgSub.BckgSub(self.files_bckgsub,True,'range','Bckg','bla','True',Area = [100,400],test = self,Live = bool(self.Live_BckgSub.get()))
+        
+        print(self.SelectPix_BckgSub.get())
+        if bool(self.SelectPix_BckgSub.get()):
+            SP_BckgSub.BckgSub(self.files_bckgsub,True,'range','Bckg','bla','True',Area = [int(self.SelectPix_Entry.get())-int(self.NPIX.get()),int(self.SelectPix_Entry.get())+int(self.NPIX.get())],test = self,Live = bool(self.Live_BckgSub.get()))
         else:
-            SP_BckgSub.BckgSub(self.files_bckgsub,True,'auto','Bckg','bla','True',Area = [self.Yloc-150,self.Yloc+150],test = self,Live = bool(self.Live_BckgSub.get()))            
+            SP_BckgSub.BckgSub(self.files_bckgsub,True,'auto','Bckg','bla','True',test = self,Live = bool(self.Live_BckgSub.get()))            
 #        os.system('python ' + Pipe_Path + '/SP_BckgSub.py ' + " ".join(self.files_bckgsub))
         self.now = datetime.datetime.now()
         module_logger_Bckgsub.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Cosmic correction done' )
@@ -2016,6 +2038,9 @@ class simpleapp_tk(Tk):
         
         self.Yloc = max_index+int(y)-box
         print(self.Yloc)
+        
+        self.SelectPix_Entry.delete(0,END)
+        self.SelectPix_Entry.insert(0,self.Yloc)
         
         fig, ax = plt.subplots()
         plt.plot(Line,Label = 'Spectrum')
