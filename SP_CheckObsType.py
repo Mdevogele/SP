@@ -33,7 +33,13 @@ import shutil
 import pickle
 
 import pandas as pd
-from sklearn import preprocessing, cross_validation, neighbors
+
+from sklearn import preprocessing, neighbors
+try: 
+    from sklearn import cross_validation
+except:
+    from sklearn.model_selection import train_test_split as cross_validation
+        
 
 from astropy.io import fits
 
