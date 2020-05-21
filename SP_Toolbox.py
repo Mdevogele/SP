@@ -49,7 +49,13 @@ from astropy.time import Time
 
 
 from scipy.ndimage.interpolation import shift, rotate
-from ccdproc import transform_image
+try:
+    from ccdproc import transform_image
+except:
+    print("the transform_image module is not installed, the pipeline will not work for the GMOS instruments")
+    pass
+
+
 from astropy.nddata import CCDData
 
 from astropy.coordinates import ICRS, Galactic, FK4, FK5
@@ -173,7 +179,7 @@ def Fit_Arc_Line(data,Start_X,Start_Y,Range = 20):
     
 
 
-def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Tresh_Arcs = [8, 20]):
+def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Sig_Clip = 5, Tresh_Arcs = [8, 20]):
 
 
     Arcs[np.isnan(Arcs)] = 0
@@ -181,7 +187,7 @@ def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Tresh_Arcs = [8, 20]):
     Arcs_loc = []
     max_index, max_value = max(enumerate(Arcs), key=operator.itemgetter(1))
     plt.plot(Arcs)
-    while np.median(Arcs) < max_value-5*np.std(Arcs):
+    while np.median(Arcs) < max_value-Sig_Clip*np.std(Arcs):
         max_index, max_value = max(enumerate(Arcs), key=operator.itemgetter(1))
         
         if max_index>0:
@@ -211,7 +217,7 @@ def Auto_Detect_Lines(Arcs, Tresh_Det = 1.5, Tresh_Arcs = [8, 20]):
                 Arcs[:max_ind+4] = np.nanmedian(Arcs)
     
     for elem in Arcs_loc:
-        plt.plot([elem,elem],[0,60000])
+        plt.plot([elem,elem],[0,6000])
     
     return Arcs_loc
 
@@ -1465,7 +1471,7 @@ def Shift_Spec(Spectre,Err,Wavel,**kw):
     print(Instrument)
     
     if Instrument == 'Deveny':
-        Inter = np.linspace(0.7500,0.7700,1000)
+        Inter = np.linspace(0.3500,0.3700,1000)
         
         f1 = interp1d(Wavel[0], Spectre[0])
         f2 = interp1d(Wavel[1], Spectre[1]) 
@@ -1474,7 +1480,7 @@ def Shift_Spec(Spectre,Err,Wavel,**kw):
         diffY = []
         sub = np.linspace(-0.004,0.004,50000)
         for i in sub:
-            Inter2 = np.linspace(0.7500+i,0.7700+i,1000)
+            Inter2 = np.linspace(0.3500+i,0.3700+i,1000)
             New1 = f1(Inter2)
             New2 = f2(Inter)
             dev = np.nanstd(New1/New2)

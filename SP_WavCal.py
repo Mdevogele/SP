@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+ #!/usr/bin/env python
 
 """ SP_WavCal - Perform the wavelength calibration
     v1.0: 2018-04-19, mdevogele@lowell.edu
@@ -97,21 +97,30 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
         Dim.append(np.size(Arcs,0))
         Dim.append(np.size(Arcs,1))
     
+    
         Arcs_L = Arcs[Line,:] 
-        Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 1.1, Tresh_Arcs = [2, 12] )
+        print(Arcs_L)
+        Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L,Sig_Clip = 2 ,Tresh_Det = 1, Tresh_Arcs = [1, 5] )
         
         
         if telescope == 'DEVENY':
-            if Grating == 150:
-                f = open(Pipe_Path +'/Pre_Comp_Deveny')
+#            if Grating == 150:
+#                f = open(Pipe_Path +'/Pre_Comp_Deveny')
+#                Pre = pickle.load(f)
+#                f.close()
+#                WV = [7503.9,7635.1,7723.8,7948.2,8014.8,8115.3,8264.5,8424.6,8521.4,9122.9,9224.5,9657.8]
+#            if Grating == 300:
+#                f = open(Pipe_Path +'/Pre_Comp_Deveny_R300')
+#                Pre = pickle.load(f)
+#                f.close()               
+#                WV = [3261.05, 3610.51, 3650.15, 4046.56, 4358.33, 4678.16, 4799.92, 5085.82, 5460.74, 5769.6, 5790.7, 6965.5, 7067.2, 7272.9, 7384.0]
+#            if Grating == 1200:
+                f = open(Pipe_Path + '/Pre_Comp_Deveny_R1200')
                 Pre = pickle.load(f)
                 f.close()
-                WV = [7503.9,7635.1,7723.8,7948.2,8014.8,8115.3,8264.5,8424.6,8521.4,9122.9,9224.5,9657.8]
-            if Grating == 300:
-                f = open(Pipe_Path +'/Pre_Comp_Deveny_R300')
-                Pre = pickle.load(f)
-                f.close()               
-                WV = [3261.05, 3610.51, 3650.15, 4046.56, 4358.33, 4678.16, 4799.92, 5085.82, 5460.74, 5769.6, 5790.7, 6965.5, 7067.2, 7272.9, 7384.0]
+                WV = [3125.67, 3131.70, 3252.52, 3261.05, 3341.48, 3403.65, 3467, 3612, 3649.56, 3650.15, 3663.28, 4046.56, 4077.84]
+
+                
         else:
             f = open(Pipe_Path + '/Wav_Precomp','r')
             Pre = pickle.load(f)

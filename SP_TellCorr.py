@@ -46,6 +46,8 @@ def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
         idx = (Wav>0.505)*(Wav<0.605)
         index = np.where(idx)
         MedA = np.nanmedian(SpecA[index])
+        if np.isnan(MedA):
+            MedA = 1
         SpecA = SpecA/MedA
         ErrA = ErrA/MedA
     
@@ -63,6 +65,8 @@ def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
         ErrSA = Spec[2]
     
         MedSA = np.nanmedian(SpecSA[index])
+        if np.isnan(MedSA):
+            MedSA = 1        
         SpecSA = SpecSA/MedSA
         ErrSA = ErrSA/MedSA
     
@@ -71,20 +75,21 @@ def TellCorr(filenames,Std,Verbose,Target,Date,Instrument):
         Err = [ErrA,ErrSA]
         try:
             SpecN,ErrN, WavN = SP.Shift_Spec(Spectre,Err,Wavel,**DetecFlags)
+            SpecA = SpecN[0]
+            SpecSA = SpecN[1]
+            ErrNA = ErrN[0]
+            ErrNSA = ErrN[1]
+    
+            Spec = SpecA/SpecSA
+            Error = np.sqrt(((ErrNA/SpecA)**2+(ErrNSA/SpecSA)**2))*Spec
+            WavNew = np.array(WavN[0])
         except:
             print('Shift spec routine failed, used unshifted spectrum')
-            SpecN=Spectre
-            ErrN = Err
-            WavN = Wavel
+            Spec = Spectre[0]/Spectre[1]
+            print('pffff' + str(Spectre[1][1250]))
+            Error = np.sqrt(((Err[0]/Spectre[0])**2+(Err[1]/Spectre[1])**2))*Spec
+            WavNew = np.array(Wav)
         
-        SpecA = SpecN[0]
-        SpecSA = SpecN[1]
-        ErrNA = ErrN[0]
-        ErrNSA = ErrN[1]
-    
-        Spec = SpecA/SpecSA
-        Error = np.sqrt(((ErrNA/SpecA)**2+(ErrNSA/SpecSA)**2))*Spec
-        WavNew = np.array(WavN[0])
         
         
         if Instrument == 'Deveny' or Instrument == 'DEVENY':
