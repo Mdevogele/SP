@@ -32,6 +32,8 @@ NOT_param = {
 
     # image orientation preferences
     'flipx'                : True,      # Is the wavelength increase with increasing X values ?
+    'transpose'            : True, # Is the spectrum vertical or horizontal? True if vertical 
+    
 
     # instrument-specific FITS header keywords
     'binning'              : ('CCDSUM#blank0', 'CCDSUM#blank1'),
@@ -55,17 +57,26 @@ NOT_param = {
                              # filtername translation dictionary
     'exptime'              : 'EXPTIME', # exposure time keyword (s)
     'airmass'              : 'AIRMASS', # airmass keyword
-    
+
+    'posangle'             : 'FIELD',    
     'grating'              : 'ALFLTNM', # grating used
-    'obstype'              : 'OBSTYPE', # get the type of observation (bias, flat, arcs, focus)
+    'obstype'              : 'IMAGETYP', # get the type of observation (bias, flat, arcs, focus)
     
     'focus'                : 'COLL_FOC', # Collimator focus header
     
-    'crop'                 : True,
-    'Y_crop'               : [800,-100],
+    'crop'                 : False,
+    'Y_crop'               : False,
     'X_crop'               : False,
-    
-    'transpose'            : True, # Is the spectrum vertical or horizontal? True if vertical 
+
+    'HDR_lamp'             : True, # Does the header contain information about lamps?
+    'lamp1'                : 'CLAMP1',
+    'lamp1_name'           : 'He',
+    'lamp2'                : 'CLAMP2',
+    'lamp2_name'           : 'Ne',
+    'lamp3'                : 'CLAMP3',
+    'lamp3_name'           : 'Halogen',
+    'lamp4'                : 'CLAMP4',
+    'lamp4_name'           : 'ThAr Holl',    
     
     'index_data'           : 1,
     
@@ -88,6 +99,7 @@ Soar_param = {
 
     # image orientation preferences
     'flipx'                : True,      # Is the wavelength increase with increasing X values ?
+    'transpose'            : False, # Is the spectrum vertical or horizontal? True if vertical 
 
     # instrument-specific FITS header keywords
     'binning'              : ('CCDSUM#blank0', 'CCDSUM#blank1'),
@@ -122,7 +134,75 @@ Soar_param = {
     'crop'                 : True,
     'Y_crop'               : [20,-20],
     'X_crop'               : False,
+
+    'HDR_lamp'             : False,    
+    'lamp1'                : 'LAMP_HGA',
+    'lamp1_name'           : 'HgAr',
+    'lamp2'                : 'LAMP_NE',
+    'lamp2_name'           : 'Ne',
+    'lamp3'                : 'LAMP_AR',
+    'lamp3_name'           : 'Ar',
+    'lamp4'                : 'LAMP_FE',
+    'lamp4_name'           : 'Fe',    
     
+    'transpose'            : False, # Is the spectrum vertical or horizontal? True if vertical
+
+    'index_data'           : 0,    
+    
+    # Limits for BIAS, FLAT, ARCS, OBJECT auto detection
+    
+    'flat_median'          : 10000,   # if the median of all pixels is > 10000 files considered as a flat
+    'bias_std'             : 10,      # if the sum of the std of the median of each axis > 10 files considered as Bias
+    'arc_object_std'       : 100      # if the ratio of std(median(axis=0)) over std(median(axis=1)) > 100 files considered as Arcs, Object otherwise     
+
+}
+
+# GOODMAN@SOAR Chile
+Soar_param2 = {
+    'telescope_instrument' : 'Goodman Spectrograph', # telescope/instrument name
+    'telescope_keyword'    : 'SOAR 4.1m',      # telescope/instrument keyword
+    'secpix'               : 0.34, # pixel size (arcsec)
+                                            # before binning
+
+    # image orientation preferences
+    'flipx'                : False,      # Is the wavelength increase with increasing X values ?
+    'transpose'            : False, # Is the spectrum vertical or horizontal? True if vertical 
+
+    # instrument-specific FITS header keywords
+    'binning'              : ('CCDSUM#blank0', 'CCDSUM#blank1'),
+                           # binning in x/y, '_blankN' denotes that both axes
+                           # are listed in one keyword, sep. by blanks
+    'extent'               : ('NAXIS1', 'NAXIS2'),   # N_pixels in x/y
+    'ra'                   : 'OBSRA',  # telescope pointing, RA
+    'dec'                  : 'OBSDEC', # telescope pointin, Dec
+    'radec_separator'      : ':',   # RA/Dec hms separator, use 'XXX'
+                                    # if already in degrees
+    'date_keyword'         : 'DATE-OBS', # obs date/time
+                                                  # keyword; use
+                                                  # 'date|time' if
+                                                  # separate
+    'obsmidtime_jd'        : 'MIDTIMJD', # obs midtime jd keyword
+                                         # (usually provided by
+                                         # pp_prepare
+    'object'               : 'OBJECT',  # object name keyword
+    'filter'               : 'FILTREAR',  # filter keyword
+    'filter_translations'  : {},
+                             # filtername translation dictionary
+    'exptime'              : 'EXPTIME', # exposure time keyword (s)
+    'airmass'              : 'AIRMASS', # airmass keyword
+    
+    'posangle'             : 'POSANGLE', 
+    'grating'              : 'GRATING', # grating used
+    'grat_ang'             : 'GRT_ANG', # grating angle
+    'obstype'              : 'OBSTYPE', # get the type of observation (bias, flat, arcs, focus)
+    
+    'focus'                : 'COLL_FOC',
+    
+    'crop'                 : True,
+    'Y_crop'               : [135,-200],
+    'X_crop'               : False,
+    
+    'HDR_lamp'             : False,
     'lamp1'                : 'LAMP_HGA',
     'lamp1_name'           : 'HgAr',
     'lamp2'                : 'LAMP_NE',
@@ -190,7 +270,8 @@ Deveny_param = {
     'crop'                 : False,
     'X_crop'               : False,
     'Y_crop'               : False,
-    
+
+    'HDR_lamp'             : True, # Does the header contain information about lamps?    
     'lamp1'                : 'LAMP1ON',
     'lamp1_name'           : 'Cd',
     'lamp2'                : 'LAMP2ON',
@@ -349,20 +430,24 @@ GMOSS_param = {
 ##### access functions for telescope configurations
 
 
-implemented_telescopes = ['SOAR','DEVENY', 'GMOS-S','GMOS-N','NOT']
+implemented_telescopes = ['SOAR','SOAR 4.1m','DEVENY', 'GMOS-S','GMOS-N','NOT']
 
 # translate INSTRUME (or others, see _pp_conf.py) header keyword into
 # PP telescope keyword
 instrument_identifiers = {'ALFOSC_FASU':        'NOT',
                           'Goodman Spectro':        'SOAR',
+                          'Goodman Spectrograph':        'SOAR 4.1m',
                           'Deveny':        'DEVENY',
                           'GMOS-S':               'GMOSS',
                           'GMOS-N':              'GMOSN'
 }
 
+
+
 # translate telescope keyword into parameter set defined here
 telescope_parameters = {'NOT' :       NOT_param,
                          'SOAR' :       Soar_param,
+                         'SOAR 4.1m' :       Soar_param2,
                         'DEVENY' :       Deveny_param,
                         'GMOSS':        GMOSS_param,
                         'GMOSN':        GMOSN_param
