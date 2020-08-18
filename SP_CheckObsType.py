@@ -115,16 +115,94 @@ def CheckObsType(filenames,telescope,obsparam,Method = 'Normal'):
         
         
         
+        #####################################################        
+        # Update lamp header to be complied with the pipeline
+        #####################################################
+        
+        # NOT telescope: header display 1 is lamp is on and 0 is off, the pipeline need T or F instead
+        # If the header is not found, it is created with 'NA'
+        # NOT telescope possesses four different lamps
+        
+        if telescope == 'NOT': 
+            try: 
+                if hdulist[0].header['CLAMP1'] == 1:
+                    hdulist[0].header['CLAMP1'] = 'True'
+                else:
+                    hdulist[0].header['CLAMP1'] = 'False'
+            except:
+                hdulist[0].header['CLAMP1'] = 'NA'
+            
+            try: 
+                if hdulist[0].header['CLAMP2'] == 1:
+                    hdulist[0].header['CLAMP2'] = 'True'
+                else:
+                    hdulist[0].header['CLAMP2'] = 'False'
+            except:
+                hdulist[0].header['CLAMP2'] = 'NA'                
+                
+            try: 
+                if hdulist[0].header['CLAMP3'] == 1:
+                    hdulist[0].header['CLAMP3'] = 'True'
+                else:
+                    hdulist[0].header['CLAMP3'] = 'False'
+            except:
+                hdulist[0].header['CLAMP3'] = 'NA'        
+        
+            try: 
+                if hdulist[0].header['CLAMP4'] == 1:
+                    hdulist[0].header['CLAMP4'] = 'True'
+                else:
+                    hdulist[0].header['CLAMP4'] = 'False'
+            except:
+                hdulist[0].header['CLAMP4'] = 'NA'        
+        
+        
+        
+        
         # Still a special treatment for NOT, SHOULD BE FIXED
         if telescope == 'NOT':
-            data = hdulist[1].data
-            hdulist[0].data = data[800:-100,:].transpose()
-            hdulist[1].data = []
+            try:
+                data = hdulist[1].data
+                hdulist[0].data = data 
+                hdulist[1].data = []
+            except:
+                pass
         else:
             data = hdulist[0].data
+        
 
-        # Check if the images need to be cropped and transposed
+        ###############################
+        # Transpose image if necessary
+        ##############################
+
+        if obsparam['transpose']:
+            data = hdulist[0].data
+            data = data.transpose()
+            hdulist[0].data = data
+            hdulist[0].header['HISTORY'] = 'Image has been rotated'
+
+
+
+        ############################
+        # Flip the data if necessary
+        ############################
+        if obsparam['flipx']:
+            hdulist[0].data = np.fliplr(hdulist[0].data)
+            hdulist[0].header['HISTORY'] = 'Image has been flipped horizontaly'
+            
+
+
+        # early SOAR data were 3 dimension instead of 2 dim matrix (1,x,y)
+        if len(data.shape) > 2:
+            hdulist[0].data = hdulist[0].data[0]
+
+        #############################
+        # Crop the image if necessary
+        #############################
+        
+        
         data = hdulist[0].data
+        print(np.shape(data))
         if obsparam['crop']:
             if obsparam['Y_crop'] and obsparam['X_crop']: # images need to be cropped in both X and Y axes
                 data = data[obsparam['Y_crop'][0]:obsparam['Y_crop'][1], obsparam['X_crop'][0]:obsparam['X_crop'][1]]
@@ -145,12 +223,9 @@ def CheckObsType(filenames,telescope,obsparam,Method = 'Normal'):
                 
             if obsparam['X_crop'] and not obsparam['Y_crop']: # images need to be cropped in X axes only
                 data = data[:, obsparam['X_crop'][0]:obsparam['X_crop'][1]]               
-        if obsparam['transpose']:
-            data = data.transpose()
-            hdulist[0].header['HISTORY'] = 'Image has been rotated'
+
             
         hdulist[0].data = data # update the data in the fits file
-
             
         # Get statistic information about the data 
         Med = np.nanmedian(data[10:-10,10:-10])
@@ -161,9 +236,6 @@ def CheckObsType(filenames,telescope,obsparam,Method = 'Normal'):
         Mean =  np.nanmean(data[10:-10,10:-10])
         Median = np.nanmedian(data[10:-10,10:-10])
         
-#        print(Mean)
-#        print(std1)
-
 
         # Update the header with statistical information about the data
         
@@ -267,7 +339,7 @@ def CheckObsType(filenames,telescope,obsparam,Method = 'Normal'):
                 
 #                print(hdulist[0].header[obsparam['grating']])      
 
-        if telescope == 'SOAR':
+        if telescope == 'SOAR' or telescope == 'SOAR 4.1m':
             index = filename.split('_')[0]
             
             if hdulist[0].header[obsparam['grating']] == '<NO GRATING>': # Acquisition files
@@ -346,13 +418,13 @@ def CheckObsType(filenames,telescope,obsparam,Method = 'Normal'):
                         if std0/std1 > 50:
                             hdulist[0].header[obsparam['obstype']] = 'ARCS/FOCUS'                                           
                             TYPE = 'ARCS'
-                            OBJECT = filename.split('_')[1]
+                            OBJECT = filename.split('_')[0]
                                             
                                     
                         Name= telescope  + '_' + index + '_' + TIME + '_' + TYPE + '_' + OBJECT + '_' + EXPTIME + '.fits'
     
 #                        shutil.copy(filename,Name)
-            hdulist[0].writeto(Name,overwrite=True)                        
+            hdulist[0].writeto(Name,overwrite=True,output_verify='ignore')                        
             _SP_conf.filenames.append(Name)
             logging.info('%s changed to %s' % (filename, Name))
             print('%s changed to %s' % (filename, Name))
@@ -435,6 +507,8 @@ def CheckObsType(filenames,telescope,obsparam,Method = 'Normal'):
                 # Update header 
                 hdulist[0].header['HISTORY'] = 'SP: %s changed to ARCS/FOCUS' % (str(hdulist[0].header[obsparam['obstype']]))
                 hdulist[0].header[obsparam['obstype']] = 'ARCS/FOCUS' 
+                Name= telescope + '_' + filename.split('.')[1] + '_' + TIME + '_ARCS_' + EXPTIME + '.fits'
+
                 Arcs = True
              
             if prediction == 'Spectrum':
@@ -484,9 +558,10 @@ def CheckObsType(filenames,telescope,obsparam,Method = 'Normal'):
                                         TYPE = 'Unknown'
                                  
                 Name= telescope  + '_' + index + '_' + TIME + '_' + TYPE + '_' + OBJECT + '_' + EXPTIME + '.fits'
-            hdulist[0].header['HISTORY'] = 'SP: %s changed to %s' % (filename, Name)
+            
 
             if not Arcs:
+                hdulist[0].header['HISTORY'] = 'SP: %s changed to %s' % (filename, Name)
                 hdulist[0].writeto(Name,overwrite=True)
                 _SP_conf.filenames.append(Name)
                 print('%s changed to %s' % (filename, Name))

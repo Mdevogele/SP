@@ -1169,25 +1169,6 @@ class simpleapp_tk(Tk):
             module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
             self.files_WavCal_Spec.append(elem)
         
-#        self.read_all_fits(self.files_WavCal)
-#        print(self.images[0])
-#        
-#        self.canvas.delete("all")
-##        self.tkimage.forget()
-#        self.canvas.forget()
-#        
-#        
-#        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
-#        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
-#                             self.tkimage.width())
-#        self.canvas.pack()
-#        self.image = self.canvas.create_image(0, 0, anchor='nw',
-#                                              image=self.tkimage)  
-#        
-#              # select first image
-#        
-#        im = self.images[0]
-#        self.tkimage.paste(im)
             
         return None
 
@@ -1197,7 +1178,7 @@ class simpleapp_tk(Tk):
         now = datetime.datetime.now()
         module_logger.info(now)
         print('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + '-a ' + " ".join(self.files_WavCal)  + ' -o ' + os.path.split(self.files_WavCal[0])[0] + '/' + self.WVName.get())
-        os.system('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + ' -a ' + " ".join(self.files_WavCal) + ' -m auto' + ' -o ' + os.path.split(self.files_WavCal[0])[0] + '/' + self.WVName.get())
+        os.system('python ' + Pipe_Path + '/SP_WavCal.py ' + " ".join(self.files_WavCal_Spec)  + ' -l 600 ' + ' -a ' + " ".join(self.files_WavCal) + ' -m Auto' + ' -o ' + os.path.split(self.files_WavCal[0])[0] + '/' + self.WVName.get())
         self.now = datetime.datetime.now()
         module_logger_WavCal.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +': ' + 'Wavelength calibration done' )
         

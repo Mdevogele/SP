@@ -402,6 +402,7 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
     # Generate the plot
     
     plt.plot(Wav,Spec,zorder=1)
+#    plt.plot(S[0],S[1],'.',label='2018 PK21')
     plt.errorbar(Wave_out,Spec_out,yerr = Error,fmt='.k',markersize=12,zorder=3, label= SpecName.split('/')[-1] + ' (Binned)')
     plt.fill_between(Wv[0:Num_Tax], Data_Tax[min_index,0:Num_Tax] - Data_Err[min_index,0:Num_Tax], Data_Tax[min_index,0:Num_Tax] + Data_Err[min_index,0:Num_Tax],alpha=0.8,facecolor='grey',zorder=2, label= 'Taxonomy: ' + str(Taxonomy[0]))    
 
@@ -425,10 +426,10 @@ def Plot_Taxonomy(Wav,Spec,SpecName,Date,Facility):
 #    plt.text(0.35,1.47, "Reduction: M. Devogele")
 
 
-    im = plt.imread(get_sample_data(Pipe_Path +'/manos_splash.eps'))
-    newax = fig.add_axes([0.82, 0.82, 0.12, 0.12], anchor='NE', zorder=1)
-    newax.imshow(im)
-    newax.axis('off')
+    # im = plt.imread(get_sample_data(Pipe_Path +'/manos_splash.eps'))
+    # newax = fig.add_axes([0.82, 0.82, 0.12, 0.12], anchor='NE', zorder=1)
+    # newax.imshow(im)
+    # newax.axis('off')
 
 
     axes.set_ylim(0.5,1.6)
@@ -1133,7 +1134,7 @@ def Create_Flat(image_list,**kw):
 
 
     if WriteFile:
-        hdulist.writeto(NameFlat, overwrite = OverWrite)
+        hdulist.writeto(NameFlat, overwrite = OverWrite,output_verify="ignore")
     
     
     
@@ -1230,7 +1231,7 @@ def Reduce(image_list,**kw):
             hdulist[0].header['HISTORY'] = 'Bias corrected with ' +  kw['Bias']          
             hdulist[0].header['HISTORY'] = 'Flat corrected with ' +  kw['Flat']   
             hdulist[0].data = red
-            hdulist.writeto(ImageOut + '.fits',overwrite = OverWrite)
+            hdulist.writeto(ImageOut + '.fits',overwrite = OverWrite,output_verify="ignore")
     else:
         for ImageIn in image_list:
             toopen = RawPath + ImageIn + '.fits'
@@ -1955,9 +1956,10 @@ def Fit_Trace(hdulist,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **k
                     p0 = coeff
 
         p0 = coeffIn
-        for i in range(Start[0],1060,1):
+        for i in range(Start[0],2070,1):
             xs = range(int(p0[4])-Range,int(p0[4])+Range)
             SS = np.median(data[xs,i-15:i+15],axis=1)
+            print("Extraction of the column {0:4}".format(str(i)), end='\r')
             coeff, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0,p_error = coeffIn,SClip = SClip)
             if coeff[4] < 0 or coeff[4] > 2000:
                 coeff = p0
@@ -2007,7 +2009,7 @@ def Fit_Trace(hdulist,Start,Range = 15,Live = 0,Live2 = False, SClip = True, **k
         coeffIn, fit, FWHM, Mask, XOut = Fit_MOFFAT(xs,SS,p0, SClip = SClip)
         
         print(coeffIn)
-        if coeffIn[4] > 480 or coeffIn[4] < 20:
+        if coeffIn[4] > 580 or coeffIn[4] < 20:
             print('The detected spectrum is too close to the edge of the CCD')
             raise ValueError('The detected spectrum is too close to the edge of the CCD')
 

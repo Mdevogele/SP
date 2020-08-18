@@ -147,10 +147,12 @@ if __name__ == '__main__':
     parser.add_argument('images', help='images to process or \'all\'',
                         nargs='+')
 
-    parser.add_argument('-d', help='',
+    parser.add_argument('-d',
+                        help='Date',
                         default = '20171019')
     
-    parser.add_argument('-f', help='',
+    parser.add_argument('-f',
+                        help='Facility',
                         default = 'Gemini')
     
     parser.add_argument('-t',

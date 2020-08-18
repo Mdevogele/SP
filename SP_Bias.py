@@ -17,7 +17,7 @@ from SP_CheckInstrument import CheckInstrument
 
 
 
-import SP_diagnostics as diag
+# import SP_diagnostics as diag
 
 def Create_Bias(filenames,MasterName,Verbose,Diagnostic,Method):
     
@@ -77,7 +77,7 @@ def Create_Bias(filenames,MasterName,Verbose,Diagnostic,Method):
    
     
     
-    hdulist.writeto(MasterName, overwrite = True)
+    hdulist.writeto(MasterName, overwrite = True,output_verify="ignore")
     hdulist.close()
     
     if Verbose:

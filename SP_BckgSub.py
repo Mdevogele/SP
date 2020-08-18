@@ -50,7 +50,7 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
         Mask[:,:] =  0
         
         
-        if telescope == 'Deveny' or telescope == 'DEVENY' or telescope == 'SOAR' or telescope == 'NOT':
+        if telescope == 'Deveny' or telescope == 'DEVENY' or telescope == 'SOAR' or telescope == 'NOT' or telescope == 'SOAR 4.1m':
             if 'Deveny' or telescope == 'DEVENY':
                 DetecFlags = {'Instrument':'Deveny'}
             if telescope == 'NOT':
@@ -124,7 +124,7 @@ def BckgSub(FileName, Verbose, Method ,Suffix,Spec_loc,Diagnostic,Area = [250,35
                 
                    
             Out_File.append(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits')
-            hdulist.writeto(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits',overwrite = True )
+            hdulist.writeto(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.fits',overwrite = True, output_verify="ignore" )
             np.savetxt(elem.replace('.fits','').replace('_Procc','') + '_' + Suffix + '.txt',Fdc)
         if telescope == 'GMOSS' or telescope == 'GMOSN':
             DetecFlags = {'Instrument':'GMOS'}

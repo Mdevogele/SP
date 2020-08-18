@@ -28,7 +28,7 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM,Yloc,Live = 
     Out_Spec = []
     telescope, obsparam = CheckInstrument([filename[0]])    
     DetecFlags = {'Instrument':telescope}
-    if telescope == 'DEVENY' or telescope == 'SOAR' or telescope =='NOT':
+    if telescope == 'DEVENY' or telescope == 'SOAR' or telescope == 'SOAR 4.1m' or telescope =='NOT':
         for elem in filename:
             # Read the fits file 
             hdulist = fits.open(elem)
@@ -42,7 +42,7 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM,Yloc,Live = 
             # Check the telescope which is used
             if telescope == 'DEVENY':
                 DetecFlags = {'Instrument':'Deveny'}  
-            if telescope == 'SOAR':
+            if telescope == 'SOAR' or telescope == 'SOAR 4.1m':
                 DetecFlags = {'Instrument':'Soar'}  
             if telescope == 'NOT':
                 DetecFlags = {'Instrument':'ALFOSC_FASU'} 
@@ -56,10 +56,10 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM,Yloc,Live = 
 
             if telescope == 'DEVENY':
                 Start = (1415,Center)
-            if telescope == 'SOAR':
+            if telescope == 'SOAR' or telescope == 'SOAR 4.1m':
                 Start = (1415,Center)
             if telescope == 'NOT':
-                Start = (250,Center)                
+                Start = (1000,Center)                
 #            Start = (1415,Center)
             
             Trace, bkg, MASK1 = SP.Fit_Trace(hdulist,Start,Range = 15, SClip = True,Live = Live,Live2 = Live2, **DetecFlags)
@@ -72,7 +72,7 @@ def Extract_Spectrum(filename,Verbose,Spec_loc,Diagnostic,Spec_FWHM,Yloc,Live = 
                     TR.append(data[0:90,idx])
             TR = np.array(TR)
             hdulist[0].data = np.transpose(TR)
-            hdulist.writeto(elem.replace('.fits','') + 'Trace.fits',overwrite = True)
+            hdulist.writeto(elem.replace('.fits','') + 'Trace.fits',overwrite = True,output_verify="ignore")
             Out_Files.append(elem.replace('.fits','') + 'Trace.fits')
 
 #            SSpec = []

@@ -23,18 +23,21 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
 #    logging.info('****** Start of SP_Wavcal script ******')
 #    logging.info('***************************************')    
     
+    telescope, obsparam = CheckInstrument([ArcsFile[0]])  
     
     Pipe_Path = _SP_conf.rootpath
     Arcs = []
     for elem in ArcsFile:
         hdulist = fits.open(elem)
         Arcs.append(hdulist[0].data)
+    print(Arcs)
        
-    Arcs = np.median(Arcs,axis=0)
+        
+    if len(np.shape(Arcs))>2:   
+        Arcs = np.median(Arcs,axis=0)
     
-    telescope, obsparam = CheckInstrument([ArcsFile[0]])  
     
-    print(telescope)
+    print(Arcs)
     
     SpecA = np.loadtxt(filenames[0]).transpose()
     SpecA = np.array(SpecA)
@@ -56,11 +59,11 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
             Gratting = hdulist[0].header[obsparam['grating']]
             Binning = hdulist[1].header['CCDSUM'][0]
             DetecFlags = {'Instrument':telescope, 'Binning' : Binning, 'Gratting':Gratting, 'Detector':Detector}  
-            print DetecFlags
+            print(DetecFlags)
 #        if telescope == 'DEVENY':
 #            DetecFlags = {'Instrument':'Deveny'} 
 #            Grating = int(str(hdulist[0].header[obsparam['grating']]).split('/')[0])
-        if telescope == 'SOAR':
+        if telescope == 'SOAR' or telescope == 'SOAR 4.1m':
             DetecFlags = {'Instrument':'Soar'}      
         if telescope == 'NOT':
             Wav = ((10.93/2)*np.array(range(np.shape(Arcs)[1]))+3609.8)/10000
@@ -98,9 +101,9 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
         Dim.append(np.size(Arcs,1))
     
     
-        Arcs_L = Arcs[Line,:] 
-        print(Arcs_L)
-        Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L,Sig_Clip = 2 ,Tresh_Det = 1, Tresh_Arcs = [1, 5] )
+        # Arcs_L = Arcs[Line,:] 
+        # print(Arcs_L)
+        # Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L,Sig_Clip = 5 ,Tresh_Det = 1.5, Tresh_Arcs = [4, 16] )
         
         
         if telescope == 'DEVENY':
@@ -120,17 +123,57 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
                 f.close()
                 WV = [3125.67, 3131.70, 3252.52, 3261.05, 3341.48, 3403.65, 3467, 3612, 3649.56, 3650.15, 3663.28, 4046.56, 4077.84]
 
-                
+
+
+        #### The way Pre_comp file is constructed has been modified for NOT. It has to be modified for other telescope too in order to work again
+        elif telescope == 'NOT':
+
+            print('NOT')
+
+            # Arcs_L = Arcs[:,120]
+            Arcs_L = Arcs[120,:]
+            
+            
+            Mask = Arcs_L<25000
+            
+            fit  = np.polyfit(np.array(range(len(Arcs_L)))[Mask],Arcs_L[Mask],8)
+            p = np.poly1d(fit)
+            
+            Arcs_L = Arcs_L - p(np.array(range(len(Arcs_L))))
+
+            # Arcs_L = Arcs[Line,:] 
+            # print(Arcs_L)
+            Arcs_Loc = SP.Auto_Detect_Lines(Arcs_L, Tresh_Det = 10, Sig_Clip=2, Tresh_Arcs = [6, 10] )
+            f = open(Pipe_Path + '/Pre_Comp_HE_NEON','rb')
+            PreComp = pickle.load(f)
+            Pre = PreComp['Rel']
+            WV = PreComp['Wave'].transpose()
+            f.close()  
+            
+            
+            
         else:
             f = open(Pipe_Path + '/Wav_Precomp','r')
+            f = open(Pipe_Path + '/Pre_Comp_GMOS','r')
             Pre = pickle.load(f)
             f.close()
             WV = [7067.2,7147.0, 7272.9, 7384.0 ,7503.9, 7635.1, 7723.8, 7948.2, 8014.8, 8115.3, 8264.5, 8408.2, 8521.4, 8667.9, 9122.9, 9224.5,9354.2,9657.8, 9784.5] 
         
+        # One = Arcs_Loc[:9]
+        # One = np.array(One).astype(float)
+        # O = One-np.max(One)
+        # O = O/np.min(O)
+
+
+        # For NOT data
         One = Arcs_Loc[:9]
         One = np.array(One).astype(float)
         O = One-np.max(One)
         O = O/np.min(O)
+        # O = 1 - O
+        O=np.sort(O)
+
+
 
         D1_one = np.sort(O)[1]
         D2_one = np.sort(O)[2]
@@ -147,17 +190,22 @@ def WavCal(filenames,ArcsFile,OutFile,Verbose,Method,Line,Full):
         AS = np.argsort(dist)
         max_index, max_value = min(enumerate(dist), key=operator.itemgetter(1))
 
-#        WV = [7067.2,7147.0, 7272.9, 7384.0 ,7503.9, 7635.1, 7723.8, 7948.2, 8014.8, 8115.3, 8264.5, 8408.2, 8521.4, 8667.9, 9122.9, 9224.5,9354.2,9657.8, 9784.5] 
 
-        comb = combinations(WV, 9)
+        # Not needed anymore as information is stored in the precomp file
+        
+        # WV = [7067.2,7147.0, 7272.9, 7384.0 ,7503.9, 7635.1, 7723.8, 7948.2, 8014.8, 8115.3, 8264.5, 8408.2, 8521.4, 8667.9, 9122.9, 9224.5,9354.2,9657.8, 9784.5] 
 
-        WV_Comb = []
+        # comb = combinations(np.array(WV), 9)
 
-        for elem in comb:
-            WV_Comb.append(elem)
+        # WV_Comb = []
+
+        # for elem in comb:
+            # WV_Comb.append(elem)
 
 
-        a,b = np.polyfit(WV_Comb[AS[0]],np.sort(One)[::-1],1)
+        a, b= np.polyfit(np.sort(WV[AS[0]]),np.sort(Arcs_Loc[:9]),1)
+
+        # a,b = np.polyfit(WV_Comb[AS[0]],np.sort(One)[::-1],1)
 
 #        Red = a*np.array(WV)+b
 #        WV_Sol = []

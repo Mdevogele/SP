@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Created on Mon Jun 24 13:31:15 2019
@@ -54,7 +54,13 @@ from glob import glob
 
 from scipy.ndimage import interpolation as interp
 
-from scipy import misc
+import imageio as misc
+
+
+# try:
+#     from scipy import misc
+# except:
+#     import imageio as misc
 
 from scipy.optimize import curve_fit
 
@@ -94,6 +100,40 @@ module_logger_TellCorr = logging.getLogger(__name__ + '.K')
 
 
 
+class ToolTip(object):
+
+    def __init__(self, widget):
+        self.widget = widget
+        self.tipwindow = None
+        self.id = None
+        self.x = self.y = 0
+
+    def showtip(self, text, Lab):
+        "Display text in tooltip window"
+        self.text = text
+#        if self.tipwindow or not self.text:
+#            return
+#        x, y, cx, cy = self.widget.bbox("insert")
+#        x = x + self.widget.winfo_rootx() + 57
+#        y = y + cy + self.widget.winfo_rooty() +27
+#        self.tipwindow = tw = Toplevel(self.widget)
+#        tw.wm_overrideredirect(1)
+#        tw.wm_geometry("+%d+%d" % (x, y))
+#        Lab['text'] = text
+        print(Lab)
+        Lab.set(text)
+#        label = Label(tw, text=self.text, justify=LEFT,
+#                      background="#ffffe0", relief=SOLID, borderwidth=1,
+#                      font=("tahoma", "8", "normal"))
+#        label.pack(ipadx=1)
+
+    def hidetip(self):
+        tw = self.tipwindow
+        self.tipwindow = None
+        if tw:
+            tw.destroy()
+
+
 class simpleapp_tk(Tk):
     def __init__(self,parent):
         Tk.__init__(self,parent)
@@ -123,12 +163,20 @@ class simpleapp_tk(Tk):
         self.frame_process.grid(column=0, row=0)
 
         # Definition of the frame containing the fits images or graphs
+        self.frame_Tips=Frame(self, width=1000, height=200)
+        self.frame_Tips.grid(column=0, row=1)
+        
+        self.TipText = StringVar(self)
+        self.Label_Tips = Label(self.frame_Tips, textvariable=self.TipText).pack()
+        self.TipText.set('test')
+        
+        # Definition of the frame containing the fits images or graphs
         self.frame_fits=Frame(self, width=1000, height=200)
-        self.frame_fits.grid(column=0, row=1)
+        self.frame_fits.grid(column=0, row=2)
         
         # Definition of the frame containing the plot toolbar
         self.frame_tb = Frame(self,width = 400,heigh = 50)        
-        self.frame_tb.grid(column=0, row=2)
+        self.frame_tb.grid(column=0, row=3)
         
         
         # Definition of the tab containing the different SP functions
@@ -261,6 +309,17 @@ class simpleapp_tk(Tk):
 
         self.TabControl.bind("<<NotebookTabChanged>>", self.handle_tab_changed)
 
+
+    def CreateToolTip(self,widget, text, Lab = 'lab'):
+        toolTip = ToolTip(widget)
+        def enter(event):
+            toolTip.showtip(text,Lab)
+        def leave(event):
+            toolTip.hidetip()
+        widget.bind('<Enter>', enter)
+        widget.bind('<Leave>', leave)
+
+
     def handle_tab_changed(self,event):
 
         selection = event.widget.select()
@@ -296,7 +355,6 @@ class simpleapp_tk(Tk):
                 self.canvas.pack()
                 self.image = self.canvas.create_image(0, 0, anchor='nw',
                                               image=self.tkimage)  
-
 
 
         # Action to be performed when BIAS tab is clicked for the first time 
@@ -345,7 +403,7 @@ class simpleapp_tk(Tk):
                         Flats.append(elem)
                     if header['PROCTYPE'] == 'MASTER BIAS':
                         Biases.append(elem)
-                    if header['OBSTYPE'] == 'OBJECT' and header['PROCTYPE'] == 'Prepared':
+                    if header[obsparam['obstype']] == 'OBJECT' and header['PROCTYPE'] == 'Prepared':
                         ToProc.append(elem)
                 except:
                     pass
@@ -471,6 +529,7 @@ class simpleapp_tk(Tk):
        
         Row_0_Bias +=1
 
+
         Label(self.Frame_Bias_Button, text='Master bias name:').grid(row=Row_0_Bias,column = 0)
         self.MasterBiasName_Bias = Entry(self.Frame_Bias_Button) 
         self.MasterBiasName_Bias.grid(row=Row_0_Bias, column=1) 
@@ -561,20 +620,39 @@ class simpleapp_tk(Tk):
         self.Preproc_load_button = Button(self.Frame_Preproc_Button, text="Load files", width=20)
         self.Preproc_load_button.grid(row=0, column=0, sticky=W)  
         self.Preproc_load_button.bind("<ButtonRelease-1>", self.load_file_preproc)    
+        self.CreateToolTip(self.Preproc_load_button,'Tips: Load the file that you want to remove the bias and correct from the flat from',Lab = self.TipText)
+
+        # Button for manually load the masterbias
+        self.Preproc_MasterBias_Load_button = Button(self.Frame_Preproc_Button, text="Load master bias", width=20)
+        self.Preproc_MasterBias_Load_button.grid(row=1, column=0, sticky=W)  
+        self.Preproc_MasterBias_Load_button.bind("<ButtonRelease-1>", self.load_file_preproc_bias)   
+        self.CreateToolTip(self.Preproc_MasterBias_Load_button,'Tips: Manually select the master bias',Lab = self.TipText)
+        
+
+        # Button for manually load the masterflat
+        self.Preproc_MasterFlat_Load_button = Button(self.Frame_Preproc_Button, text="Load master flat", width=20)
+        self.Preproc_MasterFlat_Load_button.grid(row=2, column=0, sticky=W)  
+        self.Preproc_MasterFlat_Load_button.bind("<ButtonRelease-1>", self.load_file_preproc_flat)   
+        self.CreateToolTip(self.Preproc_MasterFlat_Load_button,'Tips: Manually select the master flat',Lab = self.TipText)
+
+
  
         self.Preproc_run_button = Button(self.Frame_Preproc_Button, text="Process files", width=20)
-        self.Preproc_run_button.grid(row=1, column=0, sticky=W)  
+        self.Preproc_run_button.grid(row=3, column=0, sticky=W)  
         self.Preproc_run_button.bind("<ButtonRelease-1>", self.Preproc)   
-       
-        Label(self.Frame_Preproc_Button, text='Master flat name:').grid(row=4,column = 0)
-        self.MasterFlatName = Entry(self.Frame_Preproc_Button) 
-        self.MasterFlatName.grid(row=4, column=1) 
-        self.MasterFlatName.insert(END,'MasterFlat.fits')
+        self.CreateToolTip(self.Preproc_run_button,'Tips: Launch the preprocessing',Lab = self.TipText)
 
-        Label(self.Frame_Preproc_Button, text='Master bias name:').grid(row=3,column = 0)
-        self.MasterBiasName = Entry(self.Frame_Preproc_Button) 
-        self.MasterBiasName.grid(row=3, column=1) 
-        self.MasterBiasName.insert(END,'MasterBias.fits')
+
+       
+#        Label(self.Frame_Preproc_Button, text='Master flat name:').grid(row=4,column = 0)
+#        self.MasterFlatName = Entry(self.Frame_Preproc_Button) 
+#        self.MasterFlatName.grid(row=4, column=1) 
+#        self.MasterFlatName.insert(END,'MasterFlat.fits')
+
+#        Label(self.Frame_Preproc_Button, text='Master bias name:').grid(row=3,column = 0)
+#        self.MasterBiasName = Entry(self.Frame_Preproc_Button) 
+#        self.MasterBiasName.grid(row=3, column=1) 
+#        self.MasterBiasName.insert(END,'MasterBias.fits')
 
         self.tree_preproc_MBIAS = CheckboxTreeview(self.Frame_Preproc_Info, height =3)
         self.tree_preproc_MBIAS["columns"]=("Type","ExpTime","Mean","Median","std","Date")
@@ -585,6 +663,7 @@ class simpleapp_tk(Tk):
         self.tree_preproc_MBIAS.column("Median", width=70)
         self.tree_preproc_MBIAS.column("std", width=70)
         self.tree_preproc_MBIAS.column("Date", width=200)
+        self.CreateToolTip(self.tree_preproc_MBIAS,'Tips: List of master biases. Select one file to use to for processing',Lab = self.TipText)
         
         self.tree_preproc_MBIAS.heading("#0",text="File name",anchor=W)
         self.tree_preproc_MBIAS.heading("Type",text="Type",anchor=CENTER)
@@ -605,6 +684,7 @@ class simpleapp_tk(Tk):
         self.tree_preproc_MFLAT.column("Median", width=70)
         self.tree_preproc_MFLAT.column("std", width=70)
         self.tree_preproc_MFLAT.column("Date", width=200)
+        self.CreateToolTip(self.tree_preproc_MFLAT,'Tips: List of master flats. Select one file to use to for processing',Lab = self.TipText)
         
         self.tree_preproc_MFLAT.heading("#0",text="File name",anchor=W)
         self.tree_preproc_MFLAT.heading("Type",text="Type",anchor=CENTER)
@@ -625,6 +705,7 @@ class simpleapp_tk(Tk):
         self.tree_preproc_TOPROC.column("Median", width=70)
         self.tree_preproc_TOPROC.column("std", width=70)
         self.tree_preproc_TOPROC.column("Date", width=200)
+        self.CreateToolTip(self.tree_preproc_TOPROC,'Tips: List of files to be processed. Only selected files will be processed',Lab = self.TipText)
         
         self.tree_preproc_TOPROC.heading("#0",text="File name",anchor=W)
         self.tree_preproc_TOPROC.heading("Type",text="Type",anchor=CENTER)
@@ -964,48 +1045,76 @@ class simpleapp_tk(Tk):
 
     def Pop_WavCal_tree(self,files_list):
 
-        self.tree_WavCal.delete(*self.tree_WavCal.get_children())
-        Split = []
-        for elem in files_list:
-            print(elem)
-#                self.Pop_WavCal_tree(elem)
-            Split.append(int(elem.split('/')[-1].split('_')[1]))
-          
-        Conseq = tb.Get_Consecutive(Split)    
+        telescope, obsparam = CheckInstrument([files_list[0]])
+        
+        if telescope != 'NOT':
+            self.tree_WavCal.delete(*self.tree_WavCal.get_children())
+            Split = []
+            for elem in files_list:
+    #                self.Pop_WavCal_tree(elem)
+                Split.append(int(elem.split('/')[-1].split('_')[1]))
+              
+            Conseq = tb.Get_Consecutive(Split)    
+        else:
+            Conseq = tb.Get_Consecutive(range(len(files_list)))
  
         for elem in Conseq:
             
             telescope, obsparam = CheckInstrument([files_list[elem[0][0]]])
             hdulist = fits.open(files_list[elem[0][0]])
             ExpTime = hdulist[0].header['EXPTIME']
-            Type = hdulist[0].header['OBSTYPE']                
+            Type = hdulist[0].header[obsparam['obstype']]                
             Date = hdulist[0].header['DATE-OBS']
             Grating = hdulist[0].header[obsparam['grating']]
-            Lamp1_Text = obsparam['lamp1_name']
-            Lamp2_Text = obsparam['lamp2_name']
-            Lamp3_Text = obsparam['lamp3_name']
-            Lamp4_Text = obsparam['lamp4_name']
-
-            if hdulist[0].header[obsparam['lamp1']]:
-                Lamp1_OnOff = u'\u2713'
+            
+            if obsparam['HDR_lamp']:
+                Lamp1_Text = obsparam['lamp1_name']
+                Lamp2_Text = obsparam['lamp2_name']
+                Lamp3_Text = obsparam['lamp3_name']
+                Lamp4_Text = obsparam['lamp4_name']
+    
+                print(hdulist[0].header[obsparam['lamp1']])
+                try:
+                    if 'True' in hdulist[0].header[obsparam['lamp1']]:
+                        Lamp1_OnOff = u'\u2713'
+                    else:
+                        Lamp1_OnOff = X
+                except: 
+                    Lamp1_OnOff = 'Ukn'
+                    
+                try:
+                    if 'True' in hdulist[0].header[obsparam['lamp2']]:
+                        Lamp2_OnOff = u'\u2713'
+                    else:
+                        Lamp2_OnOff = X
+                except: 
+                    Lamp2_OnOff = 'Ukn'
+                    
+                try:
+                    if 'True' in hdulist[0].header[obsparam['lamp3']]:
+                        Lamp3_OnOff = u'\u2713'
+                    else:
+                        Lamp3_OnOff = X
+                except: 
+                    Lamp3_OnOff = 'Ukn'
+                    
+                try:
+                    if 'True' in hdulist[0].header[obsparam['lamp4']]:
+                        Lamp4_OnOff = u'\u2713'
+                    else:
+                        Lamp4_OnOff = X
+                except:
+                    Lamp4_OnOff = 'Ukn'
             else:
-                Lamp1_OnOff = X
+                Lamp1_OnOff = 'Ukn'
+                Lamp2_OnOff = 'Ukn'
+                Lamp3_OnOff = 'Ukn'
+                Lamp4_OnOff = 'Ukn'
+                Lamp1_Text = 'Ukn'
+                Lamp2_Text = 'Ukn'
+                Lamp3_Text = 'Ukn'
+                Lamp4_Text = 'Ukn'
                 
-            if hdulist[0].header[obsparam['lamp2']]:
-                Lamp2_OnOff = u'\u2713'
-            else:
-                Lamp2_OnOff = X
-                
-            if hdulist[0].header[obsparam['lamp3']]:
-                Lamp3_OnOff = u'\u2713'
-            else:
-                Lamp3_OnOff = X
-                
-            if hdulist[0].header[obsparam['lamp4']]:
-                Lamp4_OnOff = u'\u2713'
-            else:
-                Lamp4_OnOff = X
-
 
             self.tree_WavCal.heading("Lamp1", text=Lamp1_Text,anchor=CENTER)
             self.tree_WavCal.heading("Lamp2", text=Lamp2_Text,anchor=CENTER)
@@ -1025,13 +1134,13 @@ class simpleapp_tk(Tk):
                                         Lamp4_OnOff))
                                 
             # populate the individual files 
+            print(self.files_WavCal_name)
             for elem2 in elem:
                 files = self.files_WavCal_name[elem2[0]]
-                print(files)
             
                 hdulist = fits.open(files)
                 ExpTime = hdulist[0].header['EXPTIME']
-                Type = hdulist[0].header['OBSTYPE']
+                Type = hdulist[0].header[obsparam['obstype']]
                 Date = hdulist[0].header['DATE-OBS']
                 Mean = np.mean(hdulist[0].data)
                 Median = np.median(hdulist[0].data)
@@ -1062,6 +1171,7 @@ class simpleapp_tk(Tk):
         for elem in self.fname:
             module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
             self.files_WavCal.append(elem)
+            self.files_WavCal_name.append(elem)
         
         self.Pop_WavCal_tree(self.files_WavCal)
 
@@ -1369,6 +1479,29 @@ class simpleapp_tk(Tk):
 
 
 
+    def Pop_Bckg_tree(self,elem):
+        hdulist = fits.open(elem)
+        telescope, obsparam = CheckInstrument([elem])   
+        ExpTime = 'NA'
+        Type = hdulist[0].header[obsparam['obstype']]
+        Date = hdulist[0].header['DATE-OBS']
+        Mean = np.mean(hdulist[0].data)
+        Median = np.median(hdulist[0].data)
+        Std = np.std(hdulist[0].data)
+        self.Bckg_Tree = self.tree_BckgSub.insert("",
+                                    'end',
+                                    text= elem.split('/')[-1],
+                                    values=(Type,
+                                            str(ExpTime),
+                                            str("{0:.1f}".format(Mean)),
+                                            str("{0:.0f}".format(Median)),
+                                            str("{0:.1f}".format(Std)),
+                                            Date))
+
+        Children = self.tree_BckgSub.get_children()
+        self.tree_BckgSub.change_state(Children[-1], "checked")
+
+
     # Function that read the fits files
     def read_all_fits(self, filenames):
         """ read in all image data, scale images """
@@ -1380,11 +1513,13 @@ class simpleapp_tk(Tk):
             ## read image data
             hdulist = fits.open(filename, ignore_missing_end=True)
             imgdat = hdulist[0].data
+            imgdat[np.isnan(imgdat)] = 0
+            imgdat[np.isinf(imgdat)] = 0
             self.data.append(imgdat)
             
             imgdat = self.Zscale(imgdat)
             
-            print(imgdat)
+#            print(imgdat)
 
             imgdat = interp.zoom(imgdat, self.zoom)
 
@@ -1399,6 +1534,7 @@ class simpleapp_tk(Tk):
         for elem in self.fname:
             module_logger.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
             self.files_bckgsub.append(elem)
+            self.Pop_Bckg_tree(elem)
         
         self.read_all_fits(self.files_bckgsub)
         print(self.images[0])
@@ -1454,7 +1590,7 @@ class simpleapp_tk(Tk):
     def Pop_Cosmcorr_tree(self,elem):
         hdulist = fits.open(elem)
         ExpTime = hdulist[0].header['EXPTIME']
-        Type = hdulist[0].header['OBSTYPE']
+        Type = hdulist[0].header[obsparam['obstype']]
         Date = hdulist[0].header['DATE-OBS']
         Mean = np.mean(hdulist[0].data)
         Median = np.median(hdulist[0].data)
@@ -1525,8 +1661,9 @@ class simpleapp_tk(Tk):
 
     def Pop_Prep_bias_tree(self,elem):
         hdulist = fits.open(elem)
+        telescope, obsparam = CheckInstrument([elem])        
         ExpTime = hdulist[0].header['EXPTIME']
-        Type = hdulist[0].header['OBSTYPE']
+        Type = hdulist[0].header[obsparam['obstype']]
         Date = hdulist[0].header['DATE-OBS']
         Mean = np.mean(hdulist[0].data)
         Median = np.median(hdulist[0].data)
@@ -1543,8 +1680,9 @@ class simpleapp_tk(Tk):
 
     def Pop_Prep_flat_tree(self,elem):
         hdulist = fits.open(elem)
+        telescope, obsparam = CheckInstrument([elem])   
         ExpTime = hdulist[0].header['EXPTIME']
-        Type = hdulist[0].header['OBSTYPE']
+        Type = hdulist[0].header[obsparam['obstype']]
         Date = hdulist[0].header['DATE-OBS']
         Mean = np.mean(hdulist[0].data)
         Median = np.median(hdulist[0].data)
@@ -1563,8 +1701,9 @@ class simpleapp_tk(Tk):
 
     def Pop_Prep_toproc_tree(self,elem):
         hdulist = fits.open(elem)
-        ExpTime = hdulist[0].header['EXPTIME']
-        Type = hdulist[0].header['OBSTYPE']
+        telescope, obsparam = CheckInstrument([elem])   
+        ExpTime = 'NA'
+        Type = hdulist[0].header[obsparam['obstype']]
         Date = hdulist[0].header['DATE-OBS']
         Mean = np.mean(hdulist[0].data)
         Median = np.median(hdulist[0].data)
@@ -1579,6 +1718,8 @@ class simpleapp_tk(Tk):
                                             str("{0:.1f}".format(Std)),
                                             Date))
 
+        Children = self.tree_preproc_TOPROC.get_children()
+        self.tree_preproc_TOPROC.change_state(Children[-1], "checked")
 
 
 
@@ -1619,6 +1760,57 @@ class simpleapp_tk(Tk):
         self.canvas.bind("<Button 1>", self.left_click)
         self.canvas.bind("<Button 2>", self.right_click)
 
+        return None
+
+
+    def load_file_preproc_bias(self, event):
+        self.fname = askopenfilenames()
+        self.now = datetime.datetime.now()
+        self.files_bias_name = []
+        for elem in self.fname:
+            module_logger_Preproc.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
+            self.files_bias_name.append(elem)
+            self.Pop_Prep_bias_tree(elem)
+
+#        self.read_all_fits(self.files_preproc)
+#        print(self.images[0])
+#        
+#        self.canvas.delete("all")
+##        self.tkimage.forget()
+#        self.canvas.forget()
+#        
+#        
+#        self.tkimage = ImageTk.PhotoImage(self.images[0], palette=256)
+#        self.canvas = Canvas(self.frame_fits, height=self.tkimage.height(), width=
+#                             self.tkimage.width())
+#        self.canvas.pack()
+#        self.image = self.canvas.create_image(0, 0, anchor='nw',
+#                                              image=self.tkimage)  
+#        
+#              # select first image
+#        
+#        self.index = 0;
+#        im = self.images[self.index]
+#        self.tkimage.paste(im)
+#
+#                # events
+#        self.canvas.focus_set()
+#        self.canvas.bind("<Key>", self.key)
+#        self.canvas.bind("<Button 1>", self.left_click)
+#        self.canvas.bind("<Button 2>", self.right_click)
+
+        return None
+
+
+    def load_file_preproc_flat(self, event):
+        self.fname = askopenfilenames()
+        self.now = datetime.datetime.now()
+        self.files_flat_name = []
+        for elem in self.fname:
+            module_logger_Preproc.info(str(self.now.strftime("%Y-%m-%d %H:%M:%S")) +':' + ' loading file ' + str(elem).split('/')[-1])
+            self.files_flat_name.append(elem)
+            self.Pop_Prep_flat_tree(elem)
+            
         return None
 
 
@@ -1676,8 +1868,9 @@ class simpleapp_tk(Tk):
 
     def Pop_flat_tree(self,elem):
         hdulist = fits.open(elem)
+        telescope, obsparam = CheckInstrument([elem])        
         ExpTime = hdulist[0].header['EXPTIME']
-        Type = hdulist[0].header['OBSTYPE']
+        Type = hdulist[0].header[obsparam['obstype']]
         Date = hdulist[0].header['DATE-OBS']
         Mean = np.mean(hdulist[0].data)
         Median = np.median(hdulist[0].data)
@@ -1757,8 +1950,9 @@ class simpleapp_tk(Tk):
 ##############################################################################
     def Pop_bias_tree(self,elem):
         hdulist = fits.open(elem)
+        telescope, obsparam = CheckInstrument([elem])        
         ExpTime = hdulist[0].header['EXPTIME']
-        Type = hdulist[0].header['OBSTYPE']
+        Type = hdulist[0].header[obsparam['obstype']]
         Date = hdulist[0].header['DATE-OBS']
         Mean = np.mean(hdulist[0].data)
         Median = np.median(hdulist[0].data)
@@ -1862,7 +2056,7 @@ class simpleapp_tk(Tk):
             Type = header[obsparam['obstype']]
             ExpTime = header['EXPTIME']
             Date = header['DATE-OBS']
-            Grat = header['GRATING']
+            Grat = header[obsparam['grating']]
             try:
                 GratAng = header[obsparam['grat_ang']]
             except:
